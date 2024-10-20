@@ -10,14 +10,14 @@ export const uiAdmin = new Hono<{ Bindings: CfEnv; Variables: RequestVars }>();
 export const uiAbout = new Hono<{ Bindings: CfEnv; Variables: RequestVars }>();
 
 function RediflareName() {
-	return html`<span class="rediflare-name">Rediflare <span style="color: var(--pico-primary)">↝</span></span>`;
+	return html`<span class="rediflare-name">Tiddlyflare <span style="color: var(--pico-primary)">✎</span></span>`;
 }
 
 uiAbout.get('/', async (c) => {
 	return c.html(
 		Layout({
-			title: 'Rediflare - Unlimited URL redirections. Practically FREE.',
-			description: 'URL redirections tool deployed in your own Cloudflare account.',
+			title: 'Tiddlyflare - Your own TiddlyWiki hosting platform.',
+			description: 'A TiddlyWiki hosting platform deployed in your own Cloudflare account.',
 			image: '',
 			children: AboutIndex(),
 		})
@@ -41,7 +41,6 @@ function AboutIndex() {
 				</li>
 			</ul>
 			<ul>
-				<!-- <li><a href="https://developers.cloudflare.com/durable-objects/" class="contrast">Durable Objects</a></li> -->
 				<li>
 					<a href="https://github.com/lambrospetrou/rediflare" target="_blank"><button class="contrast">Github repo</button></a>
 				</li>
@@ -52,8 +51,8 @@ function AboutIndex() {
 	<main class="container">
 		<section class="about-hero">
 			<div>
-				<h2 class="text-center"><kbd>Unlimited</kbd> URL redirections. Practically <mark>FREE.</mark></h2>
-				<p class="text-center"><em>Self-host Rediflare in your own Cloudflare account.</em></p>
+				<h2 class="text-center"><kbd>Self-host</kbd> your own <mark>TiddlyWiki.</mark></h2>
+				<p class="text-center"><em>Deploy Tiddlyflare in your own Cloudflare account.</em></p>
 			</div>
 
 			<div class="mac-window">
@@ -84,7 +83,7 @@ function AboutIndex() {
 
 	<hr>
 	<footer class="container text-center">
-		<p>${RediflareName()} is built by <a href="https://www.lambrospetrou.com" target="_blank">Lambros Petrou</a>. 🚀👌</p>
+		<p>${RediflareName()} is built by <a href="https://www.lambrospetrou.com" target="_blank">Lambros Petrou</a>. 🚀</p>
 		<p><small><a href="/-_-/ui/" class="secondary">Open Admin UI</a></small></p>
 	</footer>
 
@@ -183,8 +182,8 @@ uiAdmin.get('/-_-/ui', async (c) => {
 	const main = Dashboard({});
 	return c.html(
 		Layout({
-			title: 'Rediflare - Unlimited URL redirections. Practically FREE.',
-			description: 'URL redirections tool deployed in your own Cloudflare account.',
+			title: 'Tiddlyflare - Your own TiddlyWiki hosting platform.',
+			description: 'A TiddlyWiki hosting platform deployed in your own Cloudflare account.',
 			image: '',
 			children: main,
 		})
@@ -425,13 +424,13 @@ function Dashboard(props: {}) {
 			<nav>
 				<ul>
 					<li>
-						<h1 style="margin-bottom: 0"><a href="https://rediflare.com" class="contrast">${RediflareName()}</a></h1>
+						<h1 style="margin-bottom: 0"><a href="https://tiddly.lambros.dev" class="contrast">${RediflareName()}</a></h1>
 					</li>
 				</ul>
 				<ul>
 					<!-- <li><a href="https://developers.cloudflare.com/durable-objects/" class="contrast">Durable Objects</a></li> -->
 					<li>
-						<a href="https://github.com/lambrospetrou/rediflare" target="_blank"><button class="contrast">Github repo</button></a>
+						<a href="https://github.com/lambrospetrou/tiddlyflare" target="_blank"><button class="contrast">Github repo</button></a>
 					</li>
 				</ul>
 			</nav>
@@ -489,7 +488,7 @@ function Dashboard(props: {}) {
 			<script src="/-_-/ui/static/generated/dash-stats.js" defer></script>
 		</main>
 		<footer class="container">
-			${RediflareName()} is built by <a href="https://www.lambrospetrou.com" target="_blank">Lambros Petrou</a>. 🚀👌
+			${RediflareName()} is built by <a href="https://www.lambrospetrou.com" target="_blank">Lambros Petrou</a>. 🚀
 		</footer>
 	`;
 }
