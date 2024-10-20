@@ -4,6 +4,29 @@ import { customAlphabet } from 'nanoid';
 
 export const genId = customAlphabet('0123456789BCDFGHJKLMNPQRSTVWXZbcdfghjklmnpqrstvwxz', 32);
 
+export function chunkify(bb: Uint8Array): Uint8Array[] {
+	// 2MB row size, so be comfortable at 1.5MB: https://developers.cloudflare.com/durable-objects/platform/limits/
+	const chunkSz = 1_500_000;
+	const chunks = new Array(Math.ceil(bb.length / chunkSz));
+	let readidx = 0;
+	for (let i=0; i<chunks.length; i++) {
+		const end = Math.min(readidx+chunkSz, bb.length);
+		chunks[i] = bb.subarray(readidx, end);
+		readidx = end;
+	}
+	return chunks;
+}
+
+export function mergeArrayBuffers(chunks: ArrayBuffer[]): Uint8Array {
+	const arr = new Uint8Array(chunks.reduce((acc, b) => acc + b.byteLength, 0));
+	let writeidx = 0;
+	for (let i=0; i<chunks.length; i++) {
+		arr.set(new Uint8Array(chunks[i]), writeidx);
+		writeidx += chunks[i].byteLength;
+	}
+	return arr;
+}
+
 export function apiKeyAuth(env: CfEnv, request: Request) {
 	const authEnabled = env.VAR_API_AUTH_ENABLED;
 	if (!authEnabled) {

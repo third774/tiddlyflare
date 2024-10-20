@@ -2,7 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { ApiListRedirectRulesResponse, ApiRedirectRuleStatsAggregated, WikiType } from './types';
 import { SchemaMigration, SchemaMigrations } from './sql-migrations';
 import { nanoid } from 'nanoid';
-import { genId } from './shared';
+import { chunkify, genId, mergeArrayBuffers } from './shared';
 
 export interface CfEnv {
 	TENANT: DurableObjectNamespace<TenantDO>;
@@ -217,15 +217,7 @@ export class WikiDO extends DurableObject {
 
 		const tsMs = Date.now();
 
-		// 2MB row size, so be comfortable at 1.5MB: https://developers.cloudflare.com/durable-objects/platform/limits/
-		const chunkSz = 1_500_000;
-		const chunks = new Array(Math.ceil(this.fileSrc.length / chunkSz));
-		let readidx = 0;
-		for (let i=0; i<chunks.length; i++) {
-			const end = Math.min(readidx+chunkSz, this.fileSrc.length);
-			chunks[i] = this.fileSrc.subarray(readidx, end);
-			readidx = end;
-		}
+		const chunks = chunkify(this.fileSrc);
 
 		this.storage.transactionSync(() => {
 			// I upsert here, to avoid failures, and allow retries.
@@ -258,16 +250,7 @@ export class WikiDO extends DurableObject {
 
 	async getFileSrc(wikiId: string, _tenantId: string): Promise<Response> {
 		if (this.fileSrc) {
-			new Response(new ReadableStream({
-				start(controller) {
-				  controller.enqueue(fileSrc);
-				  controller.close();
-				},
-			}), {
-				headers: {
-					"Content-Type": "text/html",
-				}
-			});
+			return this._makeStreamResponse(this.fileSrc);
 		}
 
 		const row = this.sql.exec(
@@ -289,24 +272,9 @@ export class WikiDO extends DurableObject {
 			}
 		}
 
-		this.fileSrc = new Uint8Array(chunks.reduce((acc, b) => acc + b.byteLength, 0));
-		let writeidx = 0;
-		for (let i=0; i<sz; i++) {
-			this.fileSrc.set(new Uint8Array(chunks[i]), writeidx);
-			writeidx += chunks[i].byteLength;
-		}
+		this.fileSrc = mergeArrayBuffers(chunks);
 
-		const fileSrc = this.fileSrc;
-		return new Response(new ReadableStream({
-			start(controller) {
-			  controller.enqueue(fileSrc);
-			  controller.close();
-			},
-		}), {
-			headers: {
-				"Content-Type": "text/html",
-			}
-		});
+		return this._makeStreamResponse(this.fileSrc);
 	}
 
 	async deleteAll() {
@@ -323,6 +291,19 @@ export class WikiDO extends DurableObject {
 
 	async findTenantId() {
 		return String(this.sql.exec('SELECT tenantId FROM wiki_info LIMIT 1;').one().tenantId);
+	}
+
+	_makeStreamResponse(b: Uint8Array): Response {
+		return new Response(new ReadableStream({
+			start(controller) {
+			  controller.enqueue(b);
+			  controller.close();
+			},
+		}), {
+			headers: {
+				"Content-Type": "text/html",
+			}
+		});
 	}
 }
 
