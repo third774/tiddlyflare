@@ -28,10 +28,6 @@ app.onError((e, c) => {
 });
 
 app.use('*', requestId());
-app.use(async function poweredBy(c, next) {
-	await next();
-	c.res.headers.set('X-Powered-By', 'Tiddlyflare');
-});
 app.use(logger());
 // TiddlyWiki is several MBs.
 // app.use(
