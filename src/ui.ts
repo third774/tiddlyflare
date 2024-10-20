@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { html, raw } from 'hono/html';
 import { ApiListRedirectRulesResponse, RequestVars } from './types';
 import { HTTPException } from 'hono/http-exception';
-import { CfEnv, routeDeleteUrlRedirect, routeListUrlRedirects, routeUpsertUrlRedirect } from './durable-objects';
+import { CfEnv } from './durable-objects';
 import { apiKeyAuth } from './shared';
 import { nanoid } from 'nanoid';
 
@@ -190,93 +190,93 @@ uiAdmin.get('/-_-/ui', async (c) => {
 	);
 });
 
-uiAdmin.get('/-_-/ui/partials.ListRules', async (c) => {
-	const { data } = await routeListUrlRedirects(c.req.raw, c.env, c.var.tenantId);
-	const rulesEl = Rules({
-		data,
-		swapOOB: false,
-	});
-	const statsEl = RuleStats({
-		data,
-		days: 31,
-		swapOOB: false,
-	});
-	return c.html(html`${rulesEl} ${statsEl}`);
-});
+// uiAdmin.get('/-_-/ui/partials.ListRules', async (c) => {
+// 	const { data } = await routeListUrlRedirects(c.req.raw, c.env, c.var.tenantId);
+// 	const rulesEl = Rules({
+// 		data,
+// 		swapOOB: false,
+// 	});
+// 	const statsEl = RuleStats({
+// 		data,
+// 		days: 31,
+// 		swapOOB: false,
+// 	});
+// 	return c.html(html`${rulesEl} ${statsEl}`);
+// });
 
-uiAdmin.get('/-_-/ui/partials.ListStats', async (c) => {
-	const { data } = await routeListUrlRedirects(c.req.raw, c.env, c.var.tenantId);
-	console.log(c.req.query());
-	const days = Number.parseInt(c.req.query('days') ?? '0', 10);
+// uiAdmin.get('/-_-/ui/partials.ListStats', async (c) => {
+// 	const { data } = await routeListUrlRedirects(c.req.raw, c.env, c.var.tenantId);
+// 	console.log(c.req.query());
+// 	const days = Number.parseInt(c.req.query('days') ?? '0', 10);
 
-	const statsEl = RuleStats({
-		data,
-		days,
-		swapOOB: true,
-	});
+// 	const statsEl = RuleStats({
+// 		data,
+// 		days,
+// 		swapOOB: true,
+// 	});
 
-	return c.html(html`${statsEl}`);
-});
+// 	return c.html(html`${statsEl}`);
+// });
 
-uiAdmin.post('/-_-/ui/partials.DeleteRule', async (c) => {
-	const form = await c.req.raw.formData();
-	const ruleUrl = decodeURIComponent((form.get('ruleUrl') as string) ?? '');
-	if (!ruleUrl) {
-		throw new HTTPException(400, {
-			res: new Response(`<p>Invalid request for deletion!</p>`, { status: 400 }),
-		});
-	}
-	const { data } = await routeDeleteUrlRedirect(
-		new Request(c.req.raw.url, {
-			body: JSON.stringify({ ruleUrl }),
-			method: 'POST',
-		}),
-		c.env,
-		c.var.tenantId
-	);
-	const rulesEl = Rules({
-		data,
-		swapOOB: false,
-	});
-	const statsEl = RuleStats({
-		data,
-		days: 31,
-		swapOOB: false,
-	});
-	return c.html(html`${rulesEl} ${statsEl}`);
-});
+// uiAdmin.post('/-_-/ui/partials.DeleteRule', async (c) => {
+// 	const form = await c.req.raw.formData();
+// 	const ruleUrl = decodeURIComponent((form.get('ruleUrl') as string) ?? '');
+// 	if (!ruleUrl) {
+// 		throw new HTTPException(400, {
+// 			res: new Response(`<p>Invalid request for deletion!</p>`, { status: 400 }),
+// 		});
+// 	}
+// 	const { data } = await routeDeleteUrlRedirect(
+// 		new Request(c.req.raw.url, {
+// 			body: JSON.stringify({ ruleUrl }),
+// 			method: 'POST',
+// 		}),
+// 		c.env,
+// 		c.var.tenantId
+// 	);
+// 	const rulesEl = Rules({
+// 		data,
+// 		swapOOB: false,
+// 	});
+// 	const statsEl = RuleStats({
+// 		data,
+// 		days: 31,
+// 		swapOOB: false,
+// 	});
+// 	return c.html(html`${rulesEl} ${statsEl}`);
+// });
 
-uiAdmin.post('/-_-/ui/partials.CreateRule', async (c) => {
-	const form = await c.req.raw.formData();
-	const newRuleJson = (form.get('newRuleJson') as string) ?? '';
-	if (!newRuleJson) {
-		throw new HTTPException(400, {
-			res: new Response(`<p>Invalid request for creation!</p>`, { status: 400 }),
-		});
-	}
+// uiAdmin.post('/-_-/ui/partials.CreateRule', async (c) => {
+// 	const form = await c.req.raw.formData();
+// 	const newRuleJson = (form.get('newRuleJson') as string) ?? '';
+// 	if (!newRuleJson) {
+// 		throw new HTTPException(400, {
+// 			res: new Response(`<p>Invalid request for creation!</p>`, { status: 400 }),
+// 		});
+// 	}
 
-	// TODO Parse and validate it before sending it to the DO.
-	const { data } = await routeUpsertUrlRedirect(
-		new Request(c.req.raw.url, {
-			body: newRuleJson,
-			method: 'POST',
-		}),
-		c.env,
-		c.var.tenantId
-	);
-	const rulesEl = Rules({
-		data,
-		swapOOB: true,
-	});
-	const statsEl = RuleStats({
-		data,
-		days: 31,
-		swapOOB: true,
-	});
-	const createRuleForm = CreateRuleForm();
+// 	// TODO Parse and validate it before sending it to the DO.
+// 	const { data } = await routeUpsertUrlRedirect(
+// 		new Request(c.req.raw.url, {
+// 			body: newRuleJson,
+// 			method: 'POST',
+// 		}),
+// 		c.env,
+// 		c.var.tenantId
+// 	);
+// 	const rulesEl = Rules({
+// 		data,
+// 		swapOOB: true,
+// 	});
+// 	const statsEl = RuleStats({
+// 		data,
+// 		days: 31,
+// 		swapOOB: true,
+// 	});
+// 	const createRuleForm = CreateRuleForm();
 
-	return c.html(html`${createRuleForm} ${rulesEl} ${statsEl}`);
-});
+// 	return c.html(html`${createRuleForm} ${rulesEl} ${statsEl}`);
+// });
 
 function Rules(props: { data: ApiListRedirectRulesResponse['data']; swapOOB: boolean }) {
 	const { data, swapOOB } = props;

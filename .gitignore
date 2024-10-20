@@ -1,5 +1,6 @@
 esbuild-*.json
 public/ui/static/generated/
+hurl/tmp/
 
 # Logs
 

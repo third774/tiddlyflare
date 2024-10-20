@@ -9,7 +9,8 @@
     "deploy:prod": "npm run predeploy && wrangler deploy --env prod",
     "dev": "concurrently 'npx wrangler dev --env dev' 'npm run build:js:client -- --watch=forever'",
     "cf-typegen": "wrangler types",
-    "test": "hurl --test --repeat 3 --jobs 1 ./hurl/tests",
+    "pretest": "rm -rf ./hurl/tmp/report-json && mkdir -p ./hurl/tmp/report-json",
+    "test": "npx hurl --test --repeat 1 --jobs 1 --report-json ./hurl/tmp/report-json ./hurl/tests",
     "gen:apikey": "node --experimental-modules ./_tools/gen_api_key.mjs",
     "LAMBROS-01": "THE TARGETS BELOW ARE ONLY FOR LAMBROS. CREATE YOUR OWN IF YOU FORK!",
     "LAMBROS-PROD": "hurl --test --variables-file ./hurl/.env.prod ./hurl/go.lambros.dev-upserts.hurl"

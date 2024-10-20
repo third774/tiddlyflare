@@ -7,7 +7,7 @@ import { logger } from 'hono/logger';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 
-import { CfEnv, routeDeleteUrlRedirect, routeListUrlRedirects, routeRedirectRequest, routeUpsertUrlRedirect } from './durable-objects';
+import { CfEnv, routeWikiRequest, routeCreateWiki } from './durable-objects';
 export { TenantDO, WikiDO } from './durable-objects';
 
 import { uiAbout, uiAdmin } from './ui';
@@ -32,12 +32,11 @@ app.onError((e, c) => {
 app.use('*', requestId());
 app.use(async function poweredBy(c, next) {
 	await next();
-	c.res.headers.set('X-Powered-By', 'Rediflare');
+	c.res.headers.set('X-Powered-By', 'Tiddlyflare');
 });
 app.use(logger());
 app.use(
 	cors({
-		// TODO
 		origin: '*',
 		// allowHeaders: ['Upgrade-Insecure-Requests'],
 		allowMethods: ['POST', 'GET', 'OPTIONS'],
@@ -60,24 +59,41 @@ app.use('/-_-/v1/*', async (c, next) => {
 	return next();
 });
 
-app.get('/-_-/v1/redirects.List', async (c) => {
-	const respData = await routeListUrlRedirects(c.req.raw, c.env, c.var.tenantId);
+// app.get('/-_-/v1/redirects.List', async (c) => {
+// 	const respData = await routeListUrlRedirects(c.req.raw, c.env, c.var.tenantId);
+// 	return Response.json(respData);
+// });
+
+app.post('/-_-/v1/wikis.Create', async (c) => {
+	interface Params {
+		name: string,
+		wikiType: string;
+	}
+
+	const params = (await c.req.raw.json()) as Params;
+	if (params.wikiType != "tw5") {
+		return Response.json({error: new Error("invalid wikiType")}, {
+			status: 400
+		})
+	}
+	if (!params.name?.trim()) {
+		return Response.json({error: new Error("invalid name")}, {
+			status: 400
+		})
+	}
+
+	const respData = await routeCreateWiki(c.env, c.var.tenantId, params.name, params.wikiType);
 	return Response.json(respData);
 });
 
-app.post('/-_-/v1/redirects.Upsert', async (c) => {
-	const respData = await routeUpsertUrlRedirect(c.req.raw, c.env, c.var.tenantId);
-	return Response.json(respData);
-});
-
-app.post('/-_-/v1/redirects.Delete', async (c) => {
-	const respData = await routeDeleteUrlRedirect(c.req.raw, c.env, c.var.tenantId);
-	return Response.json(respData);
-});
+// app.post('/-_-/v1/redirects.Delete', async (c) => {
+// 	const respData = await routeDeleteUrlRedirect(c.req.raw, c.env, c.var.tenantId);
+// 	return Response.json(respData);
+// });
 
 app.route('/', uiAdmin);
 app.route('/', uiAbout);
 
-app.get('/*', async (c) => {
-	return routeRedirectRequest(c.req.raw, c.env);
+app.get('/:tenantId/:wikiId/:name', async (c) => {
+	return routeWikiRequest(c.env, c.req.param("tenantId"), c.req.param("wikiId"), c.req.param("name"));
 });

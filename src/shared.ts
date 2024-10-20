@@ -1,11 +1,14 @@
 import { HTTPException } from 'hono/http-exception';
 import { CfEnv } from './durable-objects';
+import { customAlphabet } from 'nanoid';
+
+export const genId = customAlphabet('0123456789BCDFGHJKLMNPQRSTVWXZbcdfghjklmnpqrstvwxz', 32);
 
 export function apiKeyAuth(env: CfEnv, request: Request) {
 	const authEnabled = env.VAR_API_AUTH_ENABLED;
 	if (!authEnabled) {
 		console.log('skipping auth like some monster!');
-		return 'tiddlyflare-public-tenant';
+		return 'tiddlyflare-public';
 	}
 
 	// 1. Extra `Tiddlyflare-api-key` header.
@@ -36,7 +39,7 @@ export function apiKeyAuth(env: CfEnv, request: Request) {
 			message: 'Tiddlyflare-Api-Key is malformed',
 		});
 	}
-	const tenantId = authKey.slice('rf_key_'.length, lastSepIdx)?.trim();
+	const tenantId = authKey.slice('tf_key_'.length, lastSepIdx)?.trim();
 	if (!tenantId) {
 		throw new HTTPException(403, {
 			message: 'Tiddlyflare-Api-Key is malformed',

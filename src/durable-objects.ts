@@ -1,6 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
-import { ApiListRedirectRulesResponse, ApiRedirectRuleStatsAggregated } from './types';
+import { ApiListRedirectRulesResponse, ApiRedirectRuleStatsAggregated, WikiType } from './types';
 import { SchemaMigration, SchemaMigrations } from './sql-migrations';
+import { nanoid } from 'nanoid';
+import { genId } from './shared';
 
 export interface CfEnv {
 	TENANT: DurableObjectNamespace<TenantDO>;
@@ -18,37 +20,20 @@ export interface CfEnv {
 // Durable Objects
 ///////////////////
 
-const RediflareTenantMigrations: SchemaMigration[] = [
+const TenantMigrations: SchemaMigration[] = [
 	{
 		idMonotonicInc: 1,
 		description: 'initial version',
 		sql: `
             CREATE TABLE IF NOT EXISTS tenant_info(
-				tenant_id TEXT PRIMARY KEY,
+				tenantId TEXT PRIMARY KEY,
 				dataJson TEXT
 			);
-            CREATE TABLE IF NOT EXISTS rules (
-				rule_url TEXT PRIMARY KEY,
-				tenant_id TEXT,
-				response_status INTEGER,
-				response_location TEXT,
-				response_headers TEXT
-			);
-        `,
-	},
-	{
-		idMonotonicInc: 2,
-		description: 'initial version for stats table',
-		// Aggregated statistics for all the rules on the tenant.
-		// Alternatively query Analytics Engine directly from the Workers.
-		sql: `
-            CREATE TABLE IF NOT EXISTS url_visits_stats_agg (
-                tenant_id TEXT,
-				rule_url TEXT,
-				ts_hour_ms INTEGER,
-				total_visits INTEGER,
-
-				PRIMARY KEY (tenant_id, rule_url, ts_hour_ms)
+            CREATE TABLE IF NOT EXISTS wikis (
+				wikiId TEXT PRIMARY KEY,
+				tenantId TEXT,
+				name TEXT,
+				wikiType TEXT
 			);
         `,
 	},
@@ -61,10 +46,6 @@ export class TenantDO extends DurableObject {
 
 	_migrations?: SchemaMigrations;
 
-	/**
-	 * @param ctx - The interface for interacting with Durable Object state
-	 * @param env - The interface to reference bindings declared in wrangler.toml
-	 */
 	constructor(ctx: DurableObjectState, env: CfEnv) {
 		super(ctx, env);
 		this.env = env;
@@ -73,23 +54,24 @@ export class TenantDO extends DurableObject {
 		ctx.blockConcurrencyWhile(async () => {
 			this._migrations = new SchemaMigrations({
 				doStorage: ctx.storage,
-				migrations: RediflareTenantMigrations,
+				migrations: TenantMigrations,
 			});
 
 			const tableExists = this.sql.exec("SELECT name FROM sqlite_master WHERE name = 'tenant_info';").toArray().length > 0;
-			this.tenantId = tableExists ? String(this.sql.exec('SELECT tenant_id FROM tenant_info LIMIT 1').one().tenant_id) : '';
+			this.tenantId = tableExists ? String(this.sql.exec('SELECT tenantId FROM tenant_info LIMIT 1').one().tenantId) : '';
 		});
 	}
 
 	async _initTables(tenantId: string) {
 		const rowsData = await this._migrations!.runAll();
 		if (rowsData.rowsRead || rowsData.rowsWritten) {
-			console.info({ message: `RediflareTenant schema migrations`, rowsRead: rowsData.rowsRead, rowsWritten: rowsData.rowsWritten });
+			console.info({ message: `Tenant schema migrations`, rowsRead: rowsData.rowsRead, rowsWritten: rowsData.rowsWritten });
 		}
 
+		console.log("BOOM :: ", tenantId, this.tenantId)
 		if (this.tenantId) {
 			if (this.tenantId !== tenantId) {
-				throw new Error('wrong tenant ID on the wrong RediflareTenant');
+				throw new Error(`wrong tenant ID [${tenantId}] on the wrong Tenant [${this.tenantId}]`);
 			}
 		} else {
 			this.sql.exec('INSERT INTO tenant_info VALUES (?, ?) ON CONFLICT DO NOTHING;', tenantId, '{}');
@@ -98,105 +80,98 @@ export class TenantDO extends DurableObject {
 		return this.tenantId;
 	}
 
-	async upsert(tenantId: string, ruleUrl: string, responseStatus: number, responseLocation: string, responseHeaders: string[2][]) {
-		// console.log('BOOM :: TENANT :: UPSERT', tenantId, ruleUrl, responseStatus);
+	async create(tenantId: string, name: string, wikiType: WikiType) {
+		console.log('BOOM :: TENANT :: CREATE', tenantId, name, wikiType);
 		await this._initTables(tenantId);
 
-		await this.makeWikiStub(tenantId, ruleUrl).upsert(tenantId, ruleUrl, responseStatus, responseLocation, responseHeaders);
+		const doId = this.env.WIKI.newUniqueId();
+
+		// We use the DO ID stringified as our wiki ID to avoid the slowdown of `idFromName()`
+		// that does a first round-trip to US to figure out the colo of the DO.
+		// See https://developers.cloudflare.com/durable-objects/api/namespace/#newuniqueid
+		const wikiId = doId.toString();
+		const {redirectUrl} = await this.env.WIKI.get(doId).create(tenantId, wikiId, name, wikiType);
 
 		this.sql.exec(
-			`INSERT OR REPLACE INTO rules VALUES (?, ?, ?, ?, ?);`,
-			ruleUrl,
+			`INSERT OR REPLACE INTO wikis VALUES (?, ?, ?, ?);`,
+			wikiId,
 			tenantId,
-			responseStatus,
-			responseLocation,
-			JSON.stringify(responseHeaders)
+			name,
+			wikiType
 		);
 
-		return this.list();
+		return {redirectUrl};
 	}
 
-	async delete(tenantId: string, ruleUrl: string): Promise<ApiListRedirectRulesResponse> {
-		// console.log('BOOM :: TENANT :: DELETE', tenantId, ruleUrl);
-		await this._initTables(tenantId);
+	// async delete(tenantId: string, ruleUrl: string): Promise<ApiListRedirectRulesResponse> {
+	// 	// console.log('BOOM :: TENANT :: DELETE', tenantId, ruleUrl);
+	// 	await this._initTables(tenantId);
 
-		await this.makeWikiStub(tenantId, ruleUrl).deleteAll();
+	// 	await this.makeWikiStub(tenantId, ruleUrl).deleteAll();
 
-		this.sql.exec(`DELETE FROM rules WHERE rule_url = ? AND tenant_id = ?;`, ruleUrl, tenantId);
+	// 	this.sql.exec(`DELETE FROM rules WHERE rule_url = ? AND tenant_id = ?;`, ruleUrl, tenantId);
 
-		return this.list();
-	}
+	// 	return this.list();
+	// }
 
-	async list(): Promise<ApiListRedirectRulesResponse> {
-		// console.log('BOOM :: TENANT :: LIST', this.tenantId);
-		if (!this.tenantId) {
-			return {
-				data: {
-					rules: [],
-					stats: [],
-				},
-			} as ApiListRedirectRulesResponse;
-		}
+	// async list(): Promise<ApiListRedirectRulesResponse> {
+	// 	// console.log('BOOM :: TENANT :: LIST', this.tenantId);
+	// 	if (!this.tenantId) {
+	// 		return {
+	// 			data: {
+	// 				rules: [],
+	// 				stats: [],
+	// 			},
+	// 		} as ApiListRedirectRulesResponse;
+	// 	}
 
-		const data: ApiListRedirectRulesResponse['data'] = {
-			rules: this.sql
-				.exec('SELECT * FROM rules;')
-				.toArray()
-				.map((row) => ({
-					tenantId: String(row.tenant_id),
-					ruleUrl: String(row.rule_url),
-					responseStatus: Number(row.response_status),
-					responseLocation: String(row.response_location),
-					responseHeaders: JSON.parse(row.response_headers as string) as string[2][],
-				})),
+	// 	const data: ApiListRedirectRulesResponse['data'] = {
+	// 		rules: this.sql
+	// 			.exec('SELECT * FROM rules;')
+	// 			.toArray()
+	// 			.map((row) => ({
+	// 				tenantId: String(row.tenant_id),
+	// 				ruleUrl: String(row.rule_url),
+	// 				responseStatus: Number(row.response_status),
+	// 				responseLocation: String(row.response_location),
+	// 				responseHeaders: JSON.parse(row.response_headers as string) as string[2][],
+	// 			})),
 
-			stats: this.sql
-				.exec('SELECT * FROM url_visits_stats_agg')
-				.toArray()
-				.map((row) => ({
-					tenantId: String(row.tenant_id),
-					ruleUrl: String(row.rule_url),
-					tsHourMs: Number(row.ts_hour_ms),
-					totalVisits: Number(row.total_visits),
-				})),
-		};
-		return { data };
-	}
+	// 		stats: this.sql
+	// 			.exec('SELECT * FROM url_visits_stats_agg')
+	// 			.toArray()
+	// 			.map((row) => ({
+	// 				tenantId: String(row.tenant_id),
+	// 				ruleUrl: String(row.rule_url),
+	// 				tsHourMs: Number(row.ts_hour_ms),
+	// 				totalVisits: Number(row.total_visits),
+	// 			})),
+	// 	};
+	// 	return { data };
+	// }
 
-	async recordStats(aggStats: ApiRedirectRuleStatsAggregated[]) {
-		aggStats.forEach((s) => {
-			this.sql.exec(`INSERT OR REPLACE INTO url_visits_stats_agg VALUES (?, ?, ?, ?);`, s.tenantId, s.ruleUrl, s.tsHourMs, s.totalVisits);
-		});
-	}
-
-	makeWikiStub(tenantId: string, ruleUrl: string) {
-		const ruleDOName = stubIdForRuleFromTenantRule(tenantId, ruleUrl);
-		let id: DurableObjectId = this.env.WIKI.idFromName(ruleDOName);
-		let ruleStub = this.env.WIKI.get(id);
-		return ruleStub;
-	}
 }
 
-const RediflareRedirectRuleMigrations: SchemaMigration[] = [
+const WikiMigrations: SchemaMigration[] = [
 	{
 		idMonotonicInc: 1,
 		description: 'initial version',
 		sql: `
-            CREATE TABLE IF NOT EXISTS rules (
-                rule_url TEXT PRIMARY KEY,
-                tenant_id TEXT,
-                response_status INTEGER,
-                response_location TEXT,
-                response_headers TEXT
+            CREATE TABLE IF NOT EXISTS wiki_info (
+                wikiId TEXT PRIMARY KEY,
+                tenantId TEXT,
+                name TEXT,
+                wikiType TEXT
             );
 
-            CREATE TABLE IF NOT EXISTS url_visits (
-				rule_url TEXT,
-				ts_ms INTEGER,
-				id TEXT,
-				request_details TEXT,
+            CREATE TABLE IF NOT EXISTS wiki_versions (
+				wikiId TEXT,
+				tsMs INTEGER,
+				src BLOB,
+				chunkIdx INTEGER,
+				chunksTotal INTEGER,
 
-				PRIMARY KEY (rule_url, ts_ms, id)
+				PRIMARY KEY (wikiId, tsMs, chunkIdx)
 			);
         `,
 	},
@@ -206,25 +181,11 @@ export class WikiDO extends DurableObject {
 	env: CfEnv;
 	storage: DurableObjectStorage;
 	sql: SqlStorage;
-	rules: Map<
-		string,
-		{
-			tenantId: string;
-			ruleUrl: string;
-			responseStatus: number;
-			responseLocation: string;
-			responseHeaders: string[2][];
-		}
-	> = new Map();
+
+	fileSrc: Uint8Array | null = null;
 
 	_migrations?: SchemaMigrations;
 
-	_statsAlarm: number | null = null;
-
-	/**
-	 * @param ctx - The interface for interacting with Durable Object state
-	 * @param env - The interface to reference bindings declared in wrangler.toml
-	 */
 	constructor(ctx: DurableObjectState, env: CfEnv) {
 		super(ctx, env);
 		this.env = env;
@@ -234,168 +195,134 @@ export class WikiDO extends DurableObject {
 		ctx.blockConcurrencyWhile(async () => {
 			this._migrations = new SchemaMigrations({
 				doStorage: ctx.storage,
-				migrations: RediflareRedirectRuleMigrations,
+				migrations: WikiMigrations,
 			});
 
-			const res = await Promise.all([this._migrations.runAll(), this.storage.getAlarm()]);
-			this._statsAlarm = res[1];
-
-			this.rules = new Map(
-				this.sql
-					.exec(`SELECT * FROM rules;`)
-					.toArray()
-					.map((row) => {
-						return [
-							String(row.rule_url),
-							{
-								tenantId: String(row.tenant_id),
-								ruleUrl: String(row.rule_url),
-								responseStatus: Number(row.response_status),
-								responseLocation: String(row.response_location),
-								responseHeaders: JSON.parse(row.response_headers as string) as string[2][],
-							},
-						];
-					})
-			);
+			await this._migrations.runAll();
 		});
 	}
 
-	async upsert(tenantId: string, ruleUrl: string, responseStatus: number, responseLocation: string, responseHeaders: string[2][]) {
+	async create(tenantId: string, wikiId: string, name: string, wikiType: WikiType) {
 		// console.log('BOOM :: REDIRECT_RULE :: UPSERT', tenantId, ruleUrl, responseStatus);
 
-		await this._migrations?.runAll(),
+		// Fetch the content of the wiki based on the wikiType.
+		switch (wikiType) {
+		case "tw5":
+			// 2.43MB.
+			this.fileSrc = await (await this.env.ASSETS.fetch("https://this-will-not-be-used/ui/static/tw/empty.html")).bytes();
+			break
+		default:
+			throw new Error("invalid wikiType specified: "+wikiType);
+		}
+
+		const tsMs = Date.now();
+
+		// 2MB row size, so be comfortable at 1.5MB: https://developers.cloudflare.com/durable-objects/platform/limits/
+		const chunkSz = 1_500_000;
+		const chunks = new Array(Math.ceil(this.fileSrc.length / chunkSz));
+		let readidx = 0;
+		for (let i=0; i<chunks.length; i++) {
+			const end = Math.min(readidx+chunkSz, this.fileSrc.length);
+			chunks[i] = this.fileSrc.subarray(readidx, end);
+			readidx = end;
+		}
+
+		this.storage.transactionSync(() => {
+			// I upsert here, to avoid failures, and allow retries.
+			// Since each DO is identified uniquely for each wiki, it's safe to overwrite things.
 			this.sql.exec(
-				`INSERT OR REPLACE INTO rules VALUES (?, ?, ?, ?, ?);`,
-				ruleUrl,
+				`INSERT OR REPLACE INTO wiki_info VALUES (?, ?, ?, ?);`,
+				wikiId,
 				tenantId,
-				responseStatus,
-				responseLocation,
-				JSON.stringify(responseHeaders)
+				name,
+				wikiType
 			);
-		this.rules.set(ruleUrl, {
-			tenantId,
-			ruleUrl,
-			responseStatus,
-			responseLocation,
-			responseHeaders,
+			for (let i=0; i<chunks.length; i++) {
+				this.sql.exec(
+					`INSERT OR REPLACE INTO wiki_versions VALUES (?, ?, ?, ?, ?);`,
+					wikiId,
+					tsMs,
+					chunks[i],
+					i+1,
+					chunks.length
+				);
+			}
 		});
 
 		// console.log('upsert DO redirect rule', JSON.stringify({ rules: [...this.rules.entries()] }));
 
 		return {
-			data: {
-				rules: [...this.rules.entries()],
-			},
+			redirectUrl: `${tenantId}/${wikiId}/${name}`
 		};
 	}
 
-	async deleteAll() {
-		this.rules.clear();
+	async getFileSrc(wikiId: string, _tenantId: string): Promise<Response> {
+		if (this.fileSrc) {
+			new Response(new ReadableStream({
+				start(controller) {
+				  controller.enqueue(fileSrc);
+				  controller.close();
+				},
+			}), {
+				headers: {
+					"Content-Type": "text/html",
+				}
+			});
+		}
 
-		this.storage.deleteAlarm();
+		const row = this.sql.exec(
+			`SELECT * FROM wiki_versions WHERE wikiId = ? ORDER BY tsMs DESC LIMIT 1;`,
+			wikiId
+		).one();
+		const sz = Number(row.chunksTotal);
+		const chunks = new Array<ArrayBuffer>(sz);
+		for (let i=0; i<sz; i++) {
+			if (i === row.chunkIdx) {
+				chunks[row.chunkIdx as number] = row.src as ArrayBuffer;
+			} else {
+				chunks[i] = this.sql.exec(
+					`SELECT * FROM wiki_versions WHERE wikiId = ? AND tsMs = ? AND chunkIdx = ?;`,
+					wikiId,
+					row.tsMs,
+					i+1
+				).one().src as ArrayBuffer;
+			}
+		}
+
+		this.fileSrc = new Uint8Array(chunks.reduce((acc, b) => acc + b.byteLength, 0));
+		let writeidx = 0;
+		for (let i=0; i<sz; i++) {
+			this.fileSrc.set(new Uint8Array(chunks[i]), writeidx);
+			writeidx += chunks[i].byteLength;
+		}
+
+		const fileSrc = this.fileSrc;
+		return new Response(new ReadableStream({
+			start(controller) {
+			  controller.enqueue(fileSrc);
+			  controller.close();
+			},
+		}), {
+			headers: {
+				"Content-Type": "text/html",
+			}
+		});
+	}
+
+	async deleteAll() {
+		this.fileSrc = null;
+
 		await this.storage.deleteAll();
 
 		// Reset the migrations to apply next run.
 		this._migrations = new SchemaMigrations({
 			doStorage: this.ctx.storage,
-			migrations: RediflareRedirectRuleMigrations,
+			migrations: WikiMigrations,
 		});
-	}
-
-	async redirect(eyeballRequest: Request) {
-		let ruleUrl = ruleUrlFromEyeballRequest(eyeballRequest);
-		let rule = this.rules.get(ruleUrl);
-
-		// console.log("BOOM :: ", [...this.rules.entries()], rule, eyeballRequest.url, ruleUrl);
-
-		if (!rule) {
-			return new Response('Not found 404', {
-				status: 404,
-				statusText: 'Not found',
-			});
-		}
-
-		const requestInfo = {
-			userAgent: eyeballRequest.headers.get('User-Agent'),
-		};
-		this.sql.exec(`INSERT INTO url_visits VALUES (?, ?, ?, ?)`, ruleUrl, Date.now(), crypto.randomUUID(), JSON.stringify(requestInfo));
-
-		await this.scheduleStatsSubmission();
-
-		const h = new Headers();
-		h.set('X-Powered-By', 'rediflare');
-		rule.responseHeaders.forEach((rh) => h.set(rh[0], rh[1]));
-		h.set('Location', rule.responseLocation);
-		return new Response('redirecting', {
-			status: rule.responseStatus,
-			statusText: 'rediflare redirecting',
-			headers: h,
-		});
-	}
-
-	async scheduleStatsSubmission() {
-		if (!!this._statsAlarm) {
-			// Already scheduled, backoff.
-			return;
-		}
-		this._statsAlarm = Date.now() + 5_000;
-		await this.storage.setAlarm(this._statsAlarm);
-	}
-
-	async alarm() {
-		this._statsAlarm = null;
-
-		const tenantId = await this.findTenantId();
-
-		const raw = this.sql
-			.exec('SELECT * FROM url_visits')
-			.toArray()
-			.map((row) => ({
-				ruleUrl: String(row.rule_url),
-				tsMs: Number(row.ts_ms),
-				id: String(row.id),
-				requestDetailsJson: String(row.request_details),
-			}));
-
-		const agg: Map<string, ApiRedirectRuleStatsAggregated> = new Map();
-		for (const r of raw) {
-			const hourStart = Math.floor(r.tsMs / (3600 * 1000)) * (3600 * 1000);
-			const key = `${r.ruleUrl}::${hourStart}`;
-
-			if (!agg.has(key)) {
-				agg.set(key, {
-					tenantId,
-					ruleUrl: r.ruleUrl,
-					tsHourMs: hourStart,
-					totalVisits: 1,
-				});
-			} else {
-				agg.get(key)!.totalVisits += 1;
-			}
-		}
-
-		const aggStats = [...agg.values()];
-
-		let id: DurableObjectId = this.env.TENANT.idFromName(tenantId);
-		let tenantStub = this.env.TENANT.get(id);
-
-		try {
-			await tenantStub.recordStats(aggStats);
-
-			// TODO Publish stats to Workers Analytics Engine with more fine-grained detail (e.g. user agent).
-
-			// Delete all data from more than 2 hours ago to keep the storage low in this DO.
-			this.sql.exec(`
-				DELETE FROM url_visits
-				WHERE ts_ms < (strftime('%s', 'now') * 1000) - (2 * 3600 * 1000);    
-			`);
-		} catch (e) {
-			console.error({message: "failed to record stats on the tenand DO", error: e});
-		}
 	}
 
 	async findTenantId() {
-		return String(this.sql.exec('SELECT tenant_id FROM rules LIMIT 1;').one().tenant_id);
+		return String(this.sql.exec('SELECT tenantId FROM wiki_info LIMIT 1;').one().tenantId);
 	}
 }
 
@@ -408,14 +335,6 @@ function ruleUrlFromEyeballRequest(request: Request) {
 	return `${url.origin}${url.pathname}`;
 }
 
-function stubIdForRuleFromTenantRule(tenantId: string, ruleUrl: string) {
-	if (ruleUrl.startsWith('*/')) {
-		return `${tenantId}:::${ruleUrl}`;
-	}
-	// It's a full URL with origin and path.
-	return ruleUrl;
-}
-
 function stubIdForRuleFromRequest(request: Request) {
 	return ruleUrlFromEyeballRequest(request);
 }
@@ -424,44 +343,36 @@ function stubIdForRuleFromRequest(request: Request) {
 // API Handlers
 ////////////////
 
-export async function routeRedirectRequest(request: Request, env: CfEnv) {
-	const stubName = stubIdForRuleFromRequest(request);
-	let id: DurableObjectId = env.WIKI.idFromName(stubName);
+export async function routeWikiRequest(env: CfEnv, tenantId: string, wikiId: string, name: string) {
+	// Convert the hex ID back to the correct Durable Object ID.
+	let id: DurableObjectId = env.WIKI.idFromString(wikiId);
 	let stub = env.WIKI.get(id);
-	return stub.redirect(request);
+	return stub.getFileSrc(wikiId, tenantId);
 }
 
-export async function routeListUrlRedirects(request: Request, env: CfEnv, tenantId: string): Promise<ApiListRedirectRulesResponse> {
+// export async function routeListUrlRedirects(request: Request, env: CfEnv, tenantId: string): Promise<ApiListRedirectRulesResponse> {
+// 	let id: DurableObjectId = env.TENANT.idFromName(tenantId);
+// 	let tenantStub = env.TENANT.get(id);
+
+// 	return tenantStub.list();
+// }
+
+export async function routeCreateWiki(env: CfEnv, tenantId: string, name:string, wikiType: WikiType) {
+	
 	let id: DurableObjectId = env.TENANT.idFromName(tenantId);
 	let tenantStub = env.TENANT.get(id);
 
-	return tenantStub.list();
+	return tenantStub.create(tenantId, name, wikiType);
 }
 
-export async function routeUpsertUrlRedirect(request: Request, env: CfEnv, tenantId: string): Promise<ApiListRedirectRulesResponse> {
-	interface Params {
-		ruleUrl: string;
-		responseStatus: number;
-		responseLocation: string;
-		responseHeaders?: string[2][];
-	}
+// export async function routeDeleteUrlRedirect(request: Request, env: CfEnv, tenantId: string): Promise<ApiListRedirectRulesResponse> {
+// 	interface Params {
+// 		ruleUrl: string;
+// 	}
+// 	const params = (await request.json()) as Params;
 
-	const params = (await request.json()) as Params;
+// 	let id: DurableObjectId = env.TENANT.idFromName(tenantId);
+// 	let tenantStub = env.TENANT.get(id);
 
-	let id: DurableObjectId = env.TENANT.idFromName(tenantId);
-	let tenantStub = env.TENANT.get(id);
-
-	return tenantStub.upsert(tenantId, params.ruleUrl, params.responseStatus, params.responseLocation, params.responseHeaders || []);
-}
-
-export async function routeDeleteUrlRedirect(request: Request, env: CfEnv, tenantId: string): Promise<ApiListRedirectRulesResponse> {
-	interface Params {
-		ruleUrl: string;
-	}
-	const params = (await request.json()) as Params;
-
-	let id: DurableObjectId = env.TENANT.idFromName(tenantId);
-	let tenantStub = env.TENANT.get(id);
-
-	return tenantStub.delete(tenantId, params.ruleUrl);
-}
+// 	return tenantStub.delete(tenantId, params.ruleUrl);
+// }

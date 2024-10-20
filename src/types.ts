@@ -2,6 +2,8 @@ export interface RequestVars {
 	tenantId: string;
 }
 
+export type WikiType = "tw5";
+
 export interface ApiRedirectRule {
 	tenantId: string;
 	ruleUrl: string;
