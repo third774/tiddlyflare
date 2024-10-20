@@ -1,3 +1,6 @@
+#########################
+# Create a new wiki.
+
 POST http://127.0.0.1:8787/-_-/v1/wikis.Create
 Tiddlyflare-Api-Key: tf_key_TENANT1111_sometoken
 ```json
@@ -30,3 +33,11 @@ Tiddlyflare-Api-Key: tf_key_TENANT1111_sometoken
 HTTP 200
 [Asserts]
 bytes == {{ wikiHtmlBytes }}
+
+#########################
+# Assert that we support the TiddlyWiki endpoints.
+
+OPTIONS http://127.0.0.1:8787/{{ wikiUrl }}
+HTTP 200
+[Asserts]
+header "dav" == "tw5/put"

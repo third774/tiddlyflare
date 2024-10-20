@@ -1,5 +1,3 @@
-import { DurableObject } from 'cloudflare:workers';
-
 import { Hono } from 'hono/tiny';
 import { HTTPException } from 'hono/http-exception';
 import { requestId } from 'hono/request-id';
@@ -7,7 +5,7 @@ import { logger } from 'hono/logger';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 
-import { CfEnv, routeWikiRequest, routeCreateWiki } from './durable-objects';
+import { CfEnv, routeWikiRequest, routeCreateWiki, routeUpsertWiki } from './durable-objects';
 export { TenantDO, WikiDO } from './durable-objects';
 
 import { uiAbout, uiAdmin } from './ui';
@@ -35,24 +33,27 @@ app.use(async function poweredBy(c, next) {
 	c.res.headers.set('X-Powered-By', 'Tiddlyflare');
 });
 app.use(logger());
+// TiddlyWiki is several MBs.
+// app.use(
+// 	bodyLimit({
+// 		maxSize: 10 * 1024, // 10kb
+// 		onError: (c) => {
+// 			return c.text('overflow :(', 413);
+// 		},
+// 	})
+// );
+
 app.use(
+	'/-_-/v1/*',
 	cors({
 		origin: '*',
-		// allowHeaders: ['Upgrade-Insecure-Requests'],
-		allowMethods: ['POST', 'GET', 'OPTIONS'],
-		// maxAge: 600,
+		allowHeaders: ['Allow', 'If-Match'],
+		allowMethods: ['HEAD', 'PUT', 'POST', 'GET', 'OPTIONS'],
+		exposeHeaders: ['dav', 'X-Powered-By'],
+		maxAge: 900,
 		credentials: true,
 	})
 );
-app.use(
-	bodyLimit({
-		maxSize: 10 * 1024, // 10kb
-		onError: (c) => {
-			return c.text('overflow :(', 413);
-		},
-	})
-);
-
 app.use('/-_-/v1/*', async (c, next) => {
 	const tenantId = apiKeyAuth(c.env, c.req.raw);
 	c.set('tenantId', tenantId);
@@ -66,20 +67,26 @@ app.use('/-_-/v1/*', async (c, next) => {
 
 app.post('/-_-/v1/wikis.Create', async (c) => {
 	interface Params {
-		name: string,
+		name: string;
 		wikiType: string;
 	}
 
 	const params = (await c.req.raw.json()) as Params;
-	if (params.wikiType != "tw5") {
-		return Response.json({error: new Error("invalid wikiType")}, {
-			status: 400
-		})
+	if (params.wikiType != 'tw5') {
+		return Response.json(
+			{ error: new Error('invalid wikiType') },
+			{
+				status: 400,
+			}
+		);
 	}
 	if (!params.name?.trim()) {
-		return Response.json({error: new Error("invalid name")}, {
-			status: 400
-		})
+		return Response.json(
+			{ error: new Error('invalid name') },
+			{
+				status: 400,
+			}
+		);
 	}
 
 	const respData = await routeCreateWiki(c.env, c.var.tenantId, params.name, params.wikiType);
@@ -95,5 +102,67 @@ app.route('/', uiAdmin);
 app.route('/', uiAbout);
 
 app.get('/:tenantId/:wikiId/:name', async (c) => {
-	return routeWikiRequest(c.env, c.req.param("tenantId"), c.req.param("wikiId"), c.req.param("name"));
+	const { tenantId, wikiId, name } = c.req.param();
+	console.log('GET ::', tenantId, wikiId, name);
+	return routeWikiRequest(c.env, tenantId, wikiId, name);
+});
+
+app.put('/:tenantId/:wikiId/:name', async (c) => {
+	const { tenantId, wikiId, name } = c.req.param();
+	const bytes = await c.req.raw.bytes();
+	console.log('PUT :: ', tenantId, wikiId, name, bytes.length);
+
+	try {
+		const { ok } = await routeUpsertWiki(
+			c.env,
+			tenantId,
+			wikiId,
+			name,
+			new ReadableStream({
+				start(controller) {
+					controller.enqueue(bytes);
+					controller.close();
+				},
+			})
+		);
+		if (!ok) {
+			throw new Error('could not save wiki');
+		}
+
+		// TODO Add ETag.
+		return c.text('ok');
+	} catch (e) {
+		console.error({
+			message: 'PUT.Saver::failed to persist file save',
+			error: e,
+		});
+		return c.text('failed to save due to internal DO error', { status: 500 });
+	}
+});
+
+app.options('/:tenantId/:wikiId/:name', async (c) => {
+	// const { tenantId, wikiId, name } = c.req.param();
+	// console.log("OPTIONS ::", tenantId, wikiId, name);
+	// Satisfy the PUT Saver: https://github.com/TiddlyWiki/TiddlyWiki5/blob/646f5ae7cf2a46ccd298685af3228cfd14760e25/core/modules/savers/put.js#L58
+	return c.text('ok', {
+		headers: {
+			Allow: 'GET,HEAD,POST,OPTIONS,CONNECT,PUT,DAV,dav',
+			dav: 'tw5/put',
+		},
+	});
+});
+
+app.on('HEAD', '/:tenantId/:wikiId/:name', async (c) => {
+	// console.log("BOOM :: HEAD");
+	// Satisfy the PUT Saver: https://github.com/TiddlyWiki/TiddlyWiki5/blob/646f5ae7cf2a46ccd298685af3228cfd14760e25/core/modules/savers/put.js#L58
+	// TODO Add ETag.
+	return c.text('ok');
+});
+
+app.all('/*', async (c) => {
+	return new Response('_|_', {
+		headers: {
+			'X-Powered-By': 'Tiddlyflare',
+		},
+	});
 });

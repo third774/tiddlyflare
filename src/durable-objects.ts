@@ -68,7 +68,7 @@ export class TenantDO extends DurableObject {
 			console.info({ message: `Tenant schema migrations`, rowsRead: rowsData.rowsRead, rowsWritten: rowsData.rowsWritten });
 		}
 
-		console.log("BOOM :: ", tenantId, this.tenantId)
+		console.log('BOOM :: ', tenantId, this.tenantId);
 		if (this.tenantId) {
 			if (this.tenantId !== tenantId) {
 				throw new Error(`wrong tenant ID [${tenantId}] on the wrong Tenant [${this.tenantId}]`);
@@ -90,17 +90,11 @@ export class TenantDO extends DurableObject {
 		// that does a first round-trip to US to figure out the colo of the DO.
 		// See https://developers.cloudflare.com/durable-objects/api/namespace/#newuniqueid
 		const wikiId = doId.toString();
-		const {redirectUrl} = await this.env.WIKI.get(doId).create(tenantId, wikiId, name, wikiType);
+		const { redirectUrl } = await this.env.WIKI.get(doId).create(tenantId, wikiId, name, wikiType);
 
-		this.sql.exec(
-			`INSERT OR REPLACE INTO wikis VALUES (?, ?, ?, ?);`,
-			wikiId,
-			tenantId,
-			name,
-			wikiType
-		);
+		this.sql.exec(`INSERT OR REPLACE INTO wikis VALUES (?, ?, ?, ?);`, wikiId, tenantId, name, wikiType);
 
-		return {redirectUrl};
+		return { redirectUrl };
 	}
 
 	// async delete(tenantId: string, ruleUrl: string): Promise<ApiListRedirectRulesResponse> {
@@ -149,7 +143,6 @@ export class TenantDO extends DurableObject {
 	// 	};
 	// 	return { data };
 	// }
-
 }
 
 const WikiMigrations: SchemaMigration[] = [
@@ -207,12 +200,12 @@ export class WikiDO extends DurableObject {
 
 		// Fetch the content of the wiki based on the wikiType.
 		switch (wikiType) {
-		case "tw5":
-			// 2.43MB.
-			this.fileSrc = await (await this.env.ASSETS.fetch("https://this-will-not-be-used/ui/static/tw/empty.html")).bytes();
-			break
-		default:
-			throw new Error("invalid wikiType specified: "+wikiType);
+			case 'tw5':
+				// 2.43MB.
+				this.fileSrc = await (await this.env.ASSETS.fetch('https://this-will-not-be-used/ui/static/tw/empty.html')).bytes();
+				break;
+			default:
+				throw new Error('invalid wikiType specified: ' + wikiType);
 		}
 
 		const tsMs = Date.now();
@@ -222,30 +215,56 @@ export class WikiDO extends DurableObject {
 		this.storage.transactionSync(() => {
 			// I upsert here, to avoid failures, and allow retries.
 			// Since each DO is identified uniquely for each wiki, it's safe to overwrite things.
-			this.sql.exec(
-				`INSERT OR REPLACE INTO wiki_info VALUES (?, ?, ?, ?);`,
-				wikiId,
-				tenantId,
-				name,
-				wikiType
-			);
-			for (let i=0; i<chunks.length; i++) {
-				this.sql.exec(
-					`INSERT OR REPLACE INTO wiki_versions VALUES (?, ?, ?, ?, ?);`,
-					wikiId,
-					tsMs,
-					chunks[i],
-					i+1,
-					chunks.length
-				);
+			this.sql.exec(`INSERT OR REPLACE INTO wiki_info VALUES (?, ?, ?, ?);`, wikiId, tenantId, name, wikiType);
+			for (let i = 0; i < chunks.length; i++) {
+				this.sql.exec(`INSERT OR REPLACE INTO wiki_versions VALUES (?, ?, ?, ?, ?);`, wikiId, tsMs, chunks[i], i + 1, chunks.length);
 			}
 		});
 
 		// console.log('upsert DO redirect rule', JSON.stringify({ rules: [...this.rules.entries()] }));
 
 		return {
-			redirectUrl: `${tenantId}/${wikiId}/${name}`
+			ok: true,
+			redirectUrl: `${tenantId}/${wikiId}/${name}`,
 		};
+	}
+
+	async upsert(_tenantId: string, wikiId: string, bytesStream: ReadableStream) {
+		// console.log('BOOM :: REDIRECT_RULE :: UPSERT', tenantId, ruleUrl, responseStatus);
+
+		const tsMs = Date.now();
+
+		const bytes = await new Response(bytesStream).bytes();
+		const chunks = chunkify(bytes);
+
+		try {
+			this.storage.transactionSync(() => {
+				for (let i = 0; i < chunks.length; i++) {
+					console.log({
+						res: this.sql.exec(
+							`INSERT OR REPLACE INTO wiki_versions VALUES (?, ?, ?, ?, ?);`,
+							wikiId,
+							tsMs,
+							chunks[i],
+							i + 1,
+							chunks.length
+						).rowsWritten,
+					});
+				}
+			});
+		} catch (e) {
+			console.error({
+				message: 'failed to persist file upsert',
+				error: e,
+			});
+			throw e;
+		}
+
+		this.fileSrc = bytes;
+
+		// console.log('upsert DO redirect rule', JSON.stringify({ rules: [...this.rules.entries()] }));
+
+		return { ok: true };
 	}
 
 	async getFileSrc(wikiId: string, _tenantId: string): Promise<Response> {
@@ -253,22 +272,16 @@ export class WikiDO extends DurableObject {
 			return this._makeStreamResponse(this.fileSrc);
 		}
 
-		const row = this.sql.exec(
-			`SELECT * FROM wiki_versions WHERE wikiId = ? ORDER BY tsMs DESC LIMIT 1;`,
-			wikiId
-		).one();
+		const row = this.sql.exec(`SELECT * FROM wiki_versions WHERE wikiId = ? ORDER BY tsMs DESC LIMIT 1;`, wikiId).one();
 		const sz = Number(row.chunksTotal);
 		const chunks = new Array<ArrayBuffer>(sz);
-		for (let i=0; i<sz; i++) {
+		for (let i = 0; i < sz; i++) {
 			if (i === row.chunkIdx) {
 				chunks[row.chunkIdx as number] = row.src as ArrayBuffer;
 			} else {
-				chunks[i] = this.sql.exec(
-					`SELECT * FROM wiki_versions WHERE wikiId = ? AND tsMs = ? AND chunkIdx = ?;`,
-					wikiId,
-					row.tsMs,
-					i+1
-				).one().src as ArrayBuffer;
+				chunks[i] = this.sql
+					.exec(`SELECT * FROM wiki_versions WHERE wikiId = ? AND tsMs = ? AND chunkIdx = ?;`, wikiId, row.tsMs, i + 1)
+					.one().src as ArrayBuffer;
 			}
 		}
 
@@ -294,16 +307,19 @@ export class WikiDO extends DurableObject {
 	}
 
 	_makeStreamResponse(b: Uint8Array): Response {
-		return new Response(new ReadableStream({
-			start(controller) {
-			  controller.enqueue(b);
-			  controller.close();
-			},
-		}), {
-			headers: {
-				"Content-Type": "text/html",
+		return new Response(
+			new ReadableStream({
+				start(controller) {
+					controller.enqueue(b);
+					controller.close();
+				},
+			}),
+			{
+				headers: {
+					'Content-Type': 'text/html',
+				},
 			}
-		});
+		);
 	}
 }
 
@@ -338,12 +354,17 @@ export async function routeWikiRequest(env: CfEnv, tenantId: string, wikiId: str
 // 	return tenantStub.list();
 // }
 
-export async function routeCreateWiki(env: CfEnv, tenantId: string, name:string, wikiType: WikiType) {
-	
+export async function routeCreateWiki(env: CfEnv, tenantId: string, name: string, wikiType: WikiType) {
 	let id: DurableObjectId = env.TENANT.idFromName(tenantId);
 	let tenantStub = env.TENANT.get(id);
 
 	return tenantStub.create(tenantId, name, wikiType);
+}
+
+export async function routeUpsertWiki(env: CfEnv, tenantId: string, wikiId: string, name: string, bytes: ReadableStream) {
+	let id: DurableObjectId = env.WIKI.idFromString(wikiId);
+	let wikiStub = env.WIKI.get(id);
+	return wikiStub.upsert(tenantId, wikiId, bytes);
 }
 
 // export async function routeDeleteUrlRedirect(request: Request, env: CfEnv, tenantId: string): Promise<ApiListRedirectRulesResponse> {
