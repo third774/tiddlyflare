@@ -5,9 +5,8 @@ import { customAlphabet } from 'nanoid';
 // No vowels to avoid "nice" words.
 export const genId = customAlphabet('0123456789BCDFGHJKLMNPQRSTVWXZbcdfghjklmnpqrstvwxz', 32);
 
-export function chunkify(bb: Uint8Array): Uint8Array[] {
+export function chunkify(bb: Uint8Array, chunkSz: number = 1_500_000): Uint8Array[] {
 	// 2MB row size, so be comfortable at 1.5MB: https://developers.cloudflare.com/durable-objects/platform/limits/
-	const chunkSz = 1_500_000;
 	const chunks = new Array(Math.ceil(bb.length / chunkSz));
 	let readidx = 0;
 	for (let i = 0; i < chunks.length; i++) {

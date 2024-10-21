@@ -117,17 +117,23 @@ app.get('/w/:wikiId/:name', async (c) => {
 app.put('/w/:wikiId/:name', async (c) => {
 	const { wikiId, name } = c.req.param();
 	// console.log('PUT ::', wikiId, name);
-
-	console.log({headers: c.req.raw.headers.entries()})
-
 	try {
+		const contentLengthStr = c.req.raw.headers.get("Content-Length");
+		let contentLength: number | undefined = undefined;
+		if (contentLengthStr) {
+			try {
+				contentLength = Number.parseInt(contentLengthStr, 10);
+			} catch(e) {
+				// pass.
+			}
+		}
 		// const bytes = await c.req.raw.bytes();
 		await routeUpsertWiki(
 			c.env,
 			wikiId,
-			name,
 			// Pass the body stream directly!
 			c.req.raw.body!,
+			contentLength,
 		);
 
 		// TODO Add ETag.

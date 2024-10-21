@@ -16,7 +16,7 @@ wikiUrl: jsonpath "$.redirectUrl"
 #########################
 # Assert that we get some HTML back.
 
-GET http://127.0.0.1:8787/{{ wikiUrl }}
+GET http://127.0.0.1:8787{{ wikiUrl }}
 Tiddlyflare-Api-Key: tf_key_TENANT1111_sometoken
 HTTP 200
 [Captures]
@@ -28,7 +28,7 @@ xpath "string(/html/head/title)" contains "My TiddlyWiki"
 #########################
 # Assert that we get the same HTML back a 2nd time.
 
-GET http://127.0.0.1:8787/{{ wikiUrl }}
+GET http://127.0.0.1:8787{{ wikiUrl }}
 Tiddlyflare-Api-Key: tf_key_TENANT1111_sometoken
 HTTP 200
 [Asserts]
@@ -37,7 +37,7 @@ bytes == {{ wikiHtmlBytes }}
 #########################
 # Assert that we support the TiddlyWiki endpoints.
 
-OPTIONS http://127.0.0.1:8787/{{ wikiUrl }}
+OPTIONS http://127.0.0.1:8787{{ wikiUrl }}
 HTTP 200
 [Asserts]
 header "dav" == "tw5/put"
