@@ -108,20 +108,15 @@ app.get('/:wikiId/:name', async (c) => {
 
 app.put('/:wikiId/:name', async (c) => {
 	const { wikiId, name } = c.req.param();
-	const bytes = await c.req.raw.bytes();
-	console.log('PUT :: ', wikiId, name, bytes.length);
+	console.log('PUT ::', wikiId, name);
 
 	try {
+		// const bytes = await c.req.raw.bytes();
 		await routeUpsertWiki(
 			c.env,
 			wikiId,
 			name,
-			new ReadableStream({
-				start(controller) {
-					controller.enqueue(bytes);
-					controller.close();
-				},
-			})
+			c.req.raw.body!,
 		);
 
 		// TODO Add ETag.

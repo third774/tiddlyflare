@@ -231,6 +231,8 @@ export class WikiDO extends DurableObject {
 	async upsert(wikiId: string, bytesStream: ReadableStream) {
 		const tsMs = Date.now();
 
+		// TODO Do chunking and storing in SQLite directly, to avoid buffering the whole payload!
+		// https://github.com/lambrospetrou/tiddlyflare/issues/2
 		const bytes = await new Response(bytesStream).bytes();
 		const chunks = chunkify(bytes);
 
@@ -266,6 +268,8 @@ export class WikiDO extends DurableObject {
 					tss[tss.length - 1]
 				);
 				console.log({ message: 'WIKI: DELETE FROM wiki_versions', rowsWritten, rowsRead });
+
+				console.log({ message: 'WIKI: database size', databaseSizeBytes: this.sql.databaseSize });
 			});
 		} catch (e) {
 			console.error({
