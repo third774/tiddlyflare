@@ -43,26 +43,26 @@ export class TenantDO extends DurableObject {
 	sql: SqlStorage;
 	tenantId: string = '';
 
-	_migrations?: SchemaMigrations;
+	_migrations: SchemaMigrations;
 
 	constructor(ctx: DurableObjectState, env: CfEnv) {
 		super(ctx, env);
 		this.env = env;
 		this.sql = ctx.storage.sql;
 
-		ctx.blockConcurrencyWhile(async () => {
-			this._migrations = new SchemaMigrations({
-				doStorage: ctx.storage,
-				migrations: TenantMigrations,
-			});
+		this._migrations = new SchemaMigrations({
+			doStorage: ctx.storage,
+			migrations: TenantMigrations,
+		});
 
+		ctx.blockConcurrencyWhile(async () => {
 			const tableExists = this.sql.exec("SELECT name FROM sqlite_master WHERE name = 'tenant_info';").toArray().length > 0;
 			this.tenantId = tableExists ? String(this.sql.exec('SELECT tenantId FROM tenant_info LIMIT 1').one().tenantId) : '';
 		});
 	}
 
 	async _initTables(tenantId: string) {
-		const rowsData = await this._migrations!.runAll();
+		const rowsData = await this._migrations.runAll();
 		if (rowsData.rowsRead || rowsData.rowsWritten) {
 			console.info({ message: `TENANT: completed schema migrations`, rowsRead: rowsData.rowsRead, rowsWritten: rowsData.rowsWritten });
 		}
@@ -77,8 +77,8 @@ export class TenantDO extends DurableObject {
 		return this.tenantId;
 	}
 
-	async create(tenantId: string, name: string, wikiType: WikiType) {
-		console.log('BOOM :: TENANT :: CREATE', tenantId, name, wikiType);
+	async createWiki(tenantId: string, name: string, wikiType: WikiType) {
+		console.log({ message: 'TENANT: createWiki', tenantId, name, wikiType });
 		await this._initTables(tenantId);
 
 		const doId = this.env.WIKI.newUniqueId();
@@ -87,12 +87,11 @@ export class TenantDO extends DurableObject {
 		// that does a first round-trip to US to figure out the colo of the DO.
 		// See https://developers.cloudflare.com/durable-objects/api/namespace/#newuniqueid
 		const wikiId = doId.toString();
+		const { redirectUrl } = await this.env.WIKI.get(doId).create(tenantId, wikiId, name, wikiType);
 
 		this.sql.exec(`INSERT OR REPLACE INTO wikis VALUES (?, ?, ?, ?);`, wikiId, tenantId, name, wikiType);
 
-		const { redirectUrl } = await this.env.WIKI.get(doId).create(tenantId, wikiId, name, wikiType);
-
-		return { redirectUrl };
+		return { ok: true, redirectUrl };
 	}
 
 	// async delete(tenantId: string, ruleUrl: string): Promise<ApiListRedirectRulesResponse> {
@@ -211,8 +210,6 @@ export class WikiDO extends DurableObject {
 	}
 
 	async create(tenantId: string, wikiId: string, name: string, wikiType: WikiType) {
-		await this._migrations.runAll();
-
 		// Fetch the content of the wiki based on the wikiType.
 		switch (wikiType) {
 			case 'tw5':
@@ -222,18 +219,15 @@ export class WikiDO extends DurableObject {
 			default:
 				throw new Error('invalid wikiType specified: ' + wikiType);
 		}
+		const chunks = chunkify(this.fileSrc, CHUNK_SIZE_MAX);
 
 		const tsMs = Date.now();
 
-		// I upsert here, to avoid failures, and allow retries.
-		// Since each DO is identified uniquely for each wiki, it's safe to overwrite things.
-		// Store the info first, so that even if the following operations fail, we can recreate
-		// it on next visit.
-		this.sql.exec(`INSERT OR REPLACE INTO wiki_info VALUES (?, ?, ?, ?);`, wikiId, tenantId, name, wikiType);
-
-		const chunks = chunkify(this.fileSrc, CHUNK_SIZE_MAX);
+		await this._migrations.runAll();
 
 		this.storage.transactionSync(() => {
+			this.sql.exec(`INSERT OR REPLACE INTO wiki_info VALUES (?, ?, ?, ?);`, wikiId, tenantId, name, wikiType);
+
 			for (let i = 0; i < chunks.length; i++) {
 				this.sql.exec(`INSERT OR REPLACE INTO wiki_versions VALUES (?, ?, ?, ?, ?);`, wikiId, tsMs, chunks[i], i + 1, chunks.length);
 			}
@@ -248,7 +242,6 @@ export class WikiDO extends DurableObject {
 		};
 	}
 
-	// FIXME The PUT should be authenticated in the eyeball somehow since it's destructive!
 	async upsert(wikiId: string, bytesStream: ReadableStream, contentLength?: number) {
 		await this._migrations.runAll();
 
@@ -520,10 +513,14 @@ export class WikiDO extends DurableObject {
 ////////////////
 
 export async function routeCreateWiki(env: CfEnv, tenantId: string, name: string, wikiType: WikiType) {
-	let id: DurableObjectId = env.TENANT.idFromName(tenantId);
-	let tenantStub = env.TENANT.get(id);
-
-	return tenantStub.create(tenantId, name, wikiType);
+	try {
+		let id: DurableObjectId = env.TENANT.idFromName(tenantId);
+		let tenantStub = env.TENANT.get(id);
+		const resp = await tenantStub.createWiki(tenantId, name, wikiType);
+		return Response.json(resp, { status: 201 });
+	} catch (e) {
+		return Response.json({ ok: false }, { status: 500 });
+	}
 }
 
 // export async function routeListUrlRedirects(request: Request, env: CfEnv, tenantId: string): Promise<ApiListRedirectRulesResponse> {

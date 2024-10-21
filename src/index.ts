@@ -76,9 +76,7 @@ app.post('/-_-/v1/wikis.Create', async (c) => {
 		);
 	}
 
-	const respData = await routeCreateWiki(c.env, c.var.tenantId, params.name, params.wikiType);
-	c.res.headers.set('X-Powered-By', 'Tiddlyflare');
-	return c.json(respData, 201);
+	return await routeCreateWiki(c.env, c.var.tenantId, params.name, params.wikiType);
 });
 
 // app.post('/-_-/v1/redirects.Delete', async (c) => {
@@ -114,6 +112,7 @@ app.get('/w/:wikiId/:name', async (c) => {
 	return routeWikiRequest(c.env, wikiId, name);
 });
 
+// FIXME The PUT should be authenticated in the eyeball somehow since it's destructive!
 app.put('/w/:wikiId/:name', async (c) => {
 	const { wikiId, name } = c.req.param();
 	// console.log('PUT ::', wikiId, name);
