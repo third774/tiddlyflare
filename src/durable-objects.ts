@@ -87,9 +87,10 @@ export class TenantDO extends DurableObject {
 		// that does a first round-trip to US to figure out the colo of the DO.
 		// See https://developers.cloudflare.com/durable-objects/api/namespace/#newuniqueid
 		const wikiId = doId.toString();
-		const { redirectUrl } = await this.env.WIKI.get(doId).create(tenantId, wikiId, name, wikiType);
 
 		this.sql.exec(`INSERT OR REPLACE INTO wikis VALUES (?, ?, ?, ?);`, wikiId, tenantId, name, wikiType);
+
+		const { redirectUrl } = await this.env.WIKI.get(doId).create(tenantId, wikiId, name, wikiType);
 
 		return { redirectUrl };
 	}
@@ -207,12 +208,15 @@ export class WikiDO extends DurableObject {
 
 		const tsMs = Date.now();
 
+		// I upsert here, to avoid failures, and allow retries.
+		// Since each DO is identified uniquely for each wiki, it's safe to overwrite things.
+		// Store the info first, so that even if the following operations fail, we can recreate
+		// it on next visit.
+		this.sql.exec(`INSERT OR REPLACE INTO wiki_info VALUES (?, ?, ?, ?);`, wikiId, tenantId, name, wikiType);
+
 		const chunks = chunkify(this.fileSrc);
 
 		this.storage.transactionSync(() => {
-			// I upsert here, to avoid failures, and allow retries.
-			// Since each DO is identified uniquely for each wiki, it's safe to overwrite things.
-			this.sql.exec(`INSERT OR REPLACE INTO wiki_info VALUES (?, ?, ?, ?);`, wikiId, tenantId, name, wikiType);
 			for (let i = 0; i < chunks.length; i++) {
 				this.sql.exec(`INSERT OR REPLACE INTO wiki_versions VALUES (?, ?, ?, ?, ?);`, wikiId, tsMs, chunks[i], i + 1, chunks.length);
 			}
@@ -220,11 +224,11 @@ export class WikiDO extends DurableObject {
 
 		return {
 			ok: true,
-			redirectUrl: `${tenantId}/${wikiId}/${name}`,
+			redirectUrl: `${wikiId}/${name}`,
 		};
 	}
 
-	async upsert(_tenantId: string, wikiId: string, bytesStream: ReadableStream) {
+	async upsert(wikiId: string, bytesStream: ReadableStream) {
 		const tsMs = Date.now();
 
 		const bytes = await new Response(bytesStream).bytes();
@@ -276,7 +280,7 @@ export class WikiDO extends DurableObject {
 		return { ok: true };
 	}
 
-	async getFileSrc(wikiId: string, _tenantId: string): Promise<Response> {
+	async getFileSrc(wikiId: string): Promise<Response> {
 		if (this.fileSrc) {
 			return this._makeStreamResponse(this.fileSrc);
 		}
@@ -294,7 +298,7 @@ export class WikiDO extends DurableObject {
 			}
 		}
 
-		// TODO Check if it's faster here to return a ReadableStream and in the controller 
+		// TODO Check if it's faster here to return a ReadableStream and in the controller
 		// return each chunk gradually, vs merging and returning the whole thing.
 		// This will also avoid hitting memory limits where we hit the 128MB total memory.
 		this.fileSrc = mergeArrayBuffers(chunks);
@@ -343,11 +347,11 @@ export class WikiDO extends DurableObject {
 // API Handlers
 ////////////////
 
-export async function routeWikiRequest(env: CfEnv, tenantId: string, wikiId: string, name: string) {
-	// Convert the hex ID back to the correct Durable Object ID.
-	let id: DurableObjectId = env.WIKI.idFromString(wikiId);
-	let stub = env.WIKI.get(id);
-	return stub.getFileSrc(wikiId, tenantId);
+export async function routeCreateWiki(env: CfEnv, tenantId: string, name: string, wikiType: WikiType) {
+	let id: DurableObjectId = env.TENANT.idFromName(tenantId);
+	let tenantStub = env.TENANT.get(id);
+
+	return tenantStub.create(tenantId, name, wikiType);
 }
 
 // export async function routeListUrlRedirects(request: Request, env: CfEnv, tenantId: string): Promise<ApiListRedirectRulesResponse> {
@@ -357,18 +361,18 @@ export async function routeWikiRequest(env: CfEnv, tenantId: string, wikiId: str
 // 	return tenantStub.list();
 // }
 
-export async function routeCreateWiki(env: CfEnv, tenantId: string, name: string, wikiType: WikiType) {
-	let id: DurableObjectId = env.TENANT.idFromName(tenantId);
-	let tenantStub = env.TENANT.get(id);
-
-	return tenantStub.create(tenantId, name, wikiType);
+export async function routeWikiRequest(env: CfEnv, wikiId: string, name: string) {
+	// Convert the hex ID back to the correct Durable Object ID.
+	let id: DurableObjectId = env.WIKI.idFromString(wikiId);
+	let stub = env.WIKI.get(id);
+	return stub.getFileSrc(wikiId);
 }
 
-export async function routeUpsertWiki(env: CfEnv, tenantId: string, wikiId: string, name: string, bytes: ReadableStream) {
+export async function routeUpsertWiki(env: CfEnv, wikiId: string, name: string, bytes: ReadableStream) {
 	let id: DurableObjectId = env.WIKI.idFromString(wikiId);
 	let wikiStub = env.WIKI.get(id);
 	try {
-		const { ok } = await wikiStub.upsert(tenantId, wikiId, bytes);
+		const { ok } = await wikiStub.upsert(wikiId, bytes);
 		if (!ok) {
 			throw new Error('could not save wiki');
 		}

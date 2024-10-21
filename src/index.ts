@@ -89,9 +89,9 @@ app.post('/-_-/v1/wikis.Create', async (c) => {
 app.route('/', uiAdmin);
 app.route('/', uiAbout);
 
-app.get('/:tenantId/:wikiId/:name', async (c) => {
-	const { tenantId, wikiId, name } = c.req.param();
-	console.log('GET ::', tenantId, wikiId, name, c.req.method);
+app.get('/:wikiId/:name', async (c) => {
+	const { wikiId, name } = c.req.param();
+	console.log('GET ::', wikiId, name, c.req.method);
 
 	c.res.headers.set('X-Powered-By', 'Tiddlyflare');
 
@@ -103,18 +103,17 @@ app.get('/:tenantId/:wikiId/:name', async (c) => {
 	if (c.req.method.toUpperCase() === 'HEAD') {
 		return c.text('');
 	}
-	return routeWikiRequest(c.env, tenantId, wikiId, name);
+	return routeWikiRequest(c.env, wikiId, name);
 });
 
-app.put('/:tenantId/:wikiId/:name', async (c) => {
-	const { tenantId, wikiId, name } = c.req.param();
+app.put('/:wikiId/:name', async (c) => {
+	const { wikiId, name } = c.req.param();
 	const bytes = await c.req.raw.bytes();
-	console.log('PUT :: ', tenantId, wikiId, name, bytes.length);
+	console.log('PUT :: ', wikiId, name, bytes.length);
 
 	try {
 		await routeUpsertWiki(
 			c.env,
-			tenantId,
 			wikiId,
 			name,
 			new ReadableStream({
@@ -137,9 +136,9 @@ app.put('/:tenantId/:wikiId/:name', async (c) => {
 	}
 });
 
-app.options('/:tenantId/:wikiId/:name', async (c) => {
-	// const { tenantId, wikiId, name } = c.req.param();
-	// console.log("OPTIONS ::", tenantId, wikiId, name);
+app.options('/:wikiId/:name', async (c) => {
+	// const { wikiId, name } = c.req.param();
+	// console.log("OPTIONS ::", wikiId, name);
 	// Satisfy the PUT Saver: https://github.com/TiddlyWiki/TiddlyWiki5/blob/646f5ae7cf2a46ccd298685af3228cfd14760e25/core/modules/savers/put.js#L58
 	return c.text('ok', {
 		headers: {
