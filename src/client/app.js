@@ -4,6 +4,6 @@
 htmx.config.responseTargetUnsetsError = false;
 
 document.body.addEventListener('htmx:configRequest', function(evt) {
-    const keyEl = document.querySelector("#rf-api-key");
-    evt.detail.headers["Rediflare-Api-Key"] = keyEl ? keyEl.value : "";
+    const keyEl = document.querySelector("#t-api-key");
+    evt.detail.headers["Tiddlyflare-Api-Key"] = keyEl ? keyEl.value : "";
 });

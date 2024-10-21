@@ -25,12 +25,7 @@ uiAbout.get('/', async (c) => {
 });
 
 function AboutIndex() {
-	const heroSnippetCode = `"ruleUrl": "https://go.rediflare.com/boom",
-"responseStatus": 302,
-"responseLocation": "https://skybear.net",
-"responseHeaders": [
-    ["X-Powered-By", "Rediflare"]
-]`;
+	const heroSnippetCode = `TiddlyWiki ::\na non-linear personal web notebook`;
 
 	return html`
 	<header class="about-header container">
@@ -42,7 +37,7 @@ function AboutIndex() {
 			</ul>
 			<ul>
 				<li>
-					<a href="https://github.com/lambrospetrou/rediflare" target="_blank"><button class="contrast">Github repo</button></a>
+					<a href="https://github.com/lambrospetrou/tiddlyflare" target="_blank"><button class="contrast">Github repo</button></a>
 				</li>
 			</ul>
 		</nav>
@@ -51,7 +46,7 @@ function AboutIndex() {
 	<main class="container">
 		<section class="about-hero">
 			<div>
-				<h2 class="text-center"><kbd>Self-host</kbd> your own <mark>TiddlyWiki.</mark></h2>
+				<h2 class="text-center"><kbd>Hosting platform</kbd> for your <mark>TiddlyWikis.</mark></h2>
 				<p class="text-center"><em>Deploy Tiddlyflare in your own Cloudflare account.</em></p>
 			</div>
 
@@ -70,12 +65,12 @@ function AboutIndex() {
 		</section>
 
 		<section class="text-center">
-			<p><code><span class="self-window-location-domain">go.rediflare.com</span></code> uses ${RediflareName()} for its URL redirection needs.</p>
-			<p><a href="https://github.com/lambrospetrou/rediflare/fork"><button>Fork the repository ➜ <code>npm run deploy:prod</code></button></a></p>
+			<p><code><span class="self-window-location-domain">tiddly-staging.lambros.dev</span></code> uses ${RediflareName()} hosting platform for <a href="https://tiddlywiki.com" target="_blank">TiddlyWiki</a>.</p>
+			<p><a href="https://github.com/lambrospetrou/tiddlyflare/fork"><button>Fork the repository ➜ <code>npm run deploy:prod</code></button></a></p>
 
 			<script>
 			(function() {
-				document.querySelectorAll(".self-window-location-domain").forEach(n => n.innerHTML = window.location.host ?? "go.rediflare.com");
+				document.querySelectorAll(".self-window-location-domain").forEach(n => n.innerHTML = window.location.host ?? "tiddly.lambros.dev");
 			})()
 			</script>
 		</section>
@@ -84,7 +79,7 @@ function AboutIndex() {
 	<hr>
 	<footer class="container text-center">
 		<p>${RediflareName()} is built by <a href="https://www.lambrospetrou.com" target="_blank">Lambros Petrou</a>. 🚀</p>
-		<p><small><a href="/-_-/ui/" class="secondary">Open Admin UI</a></small></p>
+		<!-- <p><small><a href="/-_-/ui/" class="secondary">Open Admin UI</a></small></p> -->
 	</footer>
 
 	<style>
@@ -278,122 +273,122 @@ uiAdmin.get('/-_-/ui', async (c) => {
 // 	return c.html(html`${createRuleForm} ${rulesEl} ${statsEl}`);
 // });
 
-function Rules(props: { data: ApiListRedirectRulesResponse['data']; swapOOB: boolean }) {
-	const { data, swapOOB } = props;
+// function Rules(props: { data: ApiListRedirectRulesResponse['data']; swapOOB: boolean }) {
+// 	const { data, swapOOB } = props;
 
-	return html`
-		<section id="rules-list" hx-swap-oob="${swapOOB ? 'true' : undefined}">
-			<h3>Existing rules</h3>
-			${
-				data.rules.length === 0 ? html`<p>You have no redirect rules yet (•_•)</p>` : null
-			}
-			${
-				// TODO Improve :)
-				data.rules.map(
-					(rule) => html`
-						<article>
-							<header><a href="${rule.ruleUrl}" target="_blank">${rule.ruleUrl} ↝</a></header>
-							<pre><code>${raw(JSON.stringify(rule, null, 2))}</code></pre>
-							<footer>
-								<button
-									class="outline"
-									hx-post="/-_-/ui/partials.DeleteRule"
-									hx-vals=${raw(`'{"ruleUrl": "${encodeURIComponent(rule.ruleUrl)}"}'`)}
-									hx-target="#redirection-rules-container"
-									hx-confirm="Are you sure you want to delete rule?"
-								>
-									Delete rule
-								</button>
-							</footer>
-						</article>
-						<hr />
-					`
-				)
-			}
-		</section>
-	`;
-}
+// 	return html`
+// 		<section id="rules-list" hx-swap-oob="${swapOOB ? 'true' : undefined}">
+// 			<h3>Existing rules</h3>
+// 			${
+// 				data.rules.length === 0 ? html`<p>You have no redirect rules yet (•_•)</p>` : null
+// 			}
+// 			${
+// 				// TODO Improve :)
+// 				data.rules.map(
+// 					(rule) => html`
+// 						<article>
+// 							<header><a href="${rule.ruleUrl}" target="_blank">${rule.ruleUrl} ↝</a></header>
+// 							<pre><code>${raw(JSON.stringify(rule, null, 2))}</code></pre>
+// 							<footer>
+// 								<button
+// 									class="outline"
+// 									hx-post="/-_-/ui/partials.DeleteRule"
+// 									hx-vals=${raw(`'{"ruleUrl": "${encodeURIComponent(rule.ruleUrl)}"}'`)}
+// 									hx-target="#redirection-rules-container"
+// 									hx-confirm="Are you sure you want to delete rule?"
+// 								>
+// 									Delete rule
+// 								</button>
+// 							</footer>
+// 						</article>
+// 						<hr />
+// 					`
+// 				)
+// 			}
+// 		</section>
+// 	`;
+// }
 
-function RuleStats(props: { data: ApiListRedirectRulesResponse['data']; swapOOB: boolean; days?: number }) {
-	const { data, days, swapOOB } = props;
+// function RuleStats(props: { data: ApiListRedirectRulesResponse['data']; swapOOB: boolean; days?: number }) {
+// 	const { data, days, swapOOB } = props;
 
-	if (!data.rules.length && !data.stats.length) {
-		return html`<p>You have no statistics yet (•_•)</p>`;
-	}
+// 	if (!data.rules.length && !data.stats.length) {
+// 		return html`<p>You have no statistics yet (•_•)</p>`;
+// 	}
 
-	if (days && days > 0) {
-		// We cutoff 1h extra to cover our bucketing of 1h slots.
-		const tsCutoff = Date.now() - days * 25 * 60 * 60 * 1000;
-		data.stats = data.stats.filter((s) => s.tsHourMs > tsCutoff);
-	}
+// 	if (days && days > 0) {
+// 		// We cutoff 1h extra to cover our bucketing of 1h slots.
+// 		const tsCutoff = Date.now() - days * 25 * 60 * 60 * 1000;
+// 		data.stats = data.stats.filter((s) => s.tsHourMs > tsCutoff);
+// 	}
 
-	data.stats.sort((s1, s2) => {
-		if (s1.tsHourMs !== s2.tsHourMs) {
-			return s2.tsHourMs - s1.tsHourMs;
-		}
-		return s2.ruleUrl.localeCompare(s1.ruleUrl);
-	});
+// 	data.stats.sort((s1, s2) => {
+// 		if (s1.tsHourMs !== s2.tsHourMs) {
+// 			return s2.tsHourMs - s1.tsHourMs;
+// 		}
+// 		return s2.ruleUrl.localeCompare(s1.ruleUrl);
+// 	});
 
-	const totalAggs = new Map<string, number>();
-	data.stats.forEach((s) => totalAggs.set(s.ruleUrl, (totalAggs.get(s.ruleUrl) ?? 0) + s.totalVisits));
-	const totalCountsSorted = [...totalAggs.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+// 	const totalAggs = new Map<string, number>();
+// 	data.stats.forEach((s) => totalAggs.set(s.ruleUrl, (totalAggs.get(s.ruleUrl) ?? 0) + s.totalVisits));
+// 	const totalCountsSorted = [...totalAggs.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
-	const statsByRuleUrl = new Map<string, Array<object>>();
-	data.stats.forEach((s) => {
-		if (!statsByRuleUrl.has(s.ruleUrl)) {
-			statsByRuleUrl.set(s.ruleUrl, []);
-		}
-		statsByRuleUrl.get(s.ruleUrl)!.push(s);
-	});
+// 	const statsByRuleUrl = new Map<string, Array<object>>();
+// 	data.stats.forEach((s) => {
+// 		if (!statsByRuleUrl.has(s.ruleUrl)) {
+// 			statsByRuleUrl.set(s.ruleUrl, []);
+// 		}
+// 		statsByRuleUrl.get(s.ruleUrl)!.push(s);
+// 	});
 
-	return html` <section id="stats-list" hx-swap-oob="${swapOOB ? 'true' : undefined}">
-		<hgroup>
-			<div>
-				<h3>Statistics</h3>
-				<div role="group">
-					<button class="${!days ? 'primary' : 'outline'}" hx-get="/-_-/ui/partials.ListStats">Raw</button>
-					<button class="${days === 366 ? 'primary' : 'outline'}" hx-get="/-_-/ui/partials.ListStats?days=366">1y</button>
-					<button class="${days === 31 ? 'primary' : 'outline'}" hx-get="/-_-/ui/partials.ListStats?days=31">1m</button>
-					<button class="${days === 7 ? 'primary' : 'outline'}" hx-get="/-_-/ui/partials.ListStats?days=7">1w</button>
-				</div>
-			</div>
-			${data.stats.length === 0 ? html`<p>No stats have been aggregated yet.</p>` : null}
-		</hgroup>
-		<table class="striped">
-			<thead>
-				<tr>
-					<th scope="col">Rule URL</th>
-					<th scope="col">Total count</th>
-				</tr>
-			</thead>
-			<tbody>
-				${totalCountsSorted.map(
-					([ruleUrl, cnt]) =>
-						html`<tr>
-							<th scope="row">${ruleUrl}</th>
-							<td>${cnt}</td>
-						</tr>`
-				)}
-			</tbody>
-		</table>
+// 	return html` <section id="stats-list" hx-swap-oob="${swapOOB ? 'true' : undefined}">
+// 		<hgroup>
+// 			<div>
+// 				<h3>Statistics</h3>
+// 				<div role="group">
+// 					<button class="${!days ? 'primary' : 'outline'}" hx-get="/-_-/ui/partials.ListStats">Raw</button>
+// 					<button class="${days === 366 ? 'primary' : 'outline'}" hx-get="/-_-/ui/partials.ListStats?days=366">1y</button>
+// 					<button class="${days === 31 ? 'primary' : 'outline'}" hx-get="/-_-/ui/partials.ListStats?days=31">1m</button>
+// 					<button class="${days === 7 ? 'primary' : 'outline'}" hx-get="/-_-/ui/partials.ListStats?days=7">1w</button>
+// 				</div>
+// 			</div>
+// 			${data.stats.length === 0 ? html`<p>No stats have been aggregated yet.</p>` : null}
+// 		</hgroup>
+// 		<table class="striped">
+// 			<thead>
+// 				<tr>
+// 					<th scope="col">Rule URL</th>
+// 					<th scope="col">Total count</th>
+// 				</tr>
+// 			</thead>
+// 			<tbody>
+// 				${totalCountsSorted.map(
+// 					([ruleUrl, cnt]) =>
+// 						html`<tr>
+// 							<th scope="row">${ruleUrl}</th>
+// 							<td>${cnt}</td>
+// 						</tr>`
+// 				)}
+// 			</tbody>
+// 		</table>
 
-		${totalCountsSorted.map(([ruleUrl, totalCount]) => {
-			const randomId = nanoid();
-			return html`
-				<article>
-					<header><strong>${ruleUrl}</strong> • <em>(${totalCount})</em></header>
-					<section>
-						<script id="plot-data-${randomId}" type="application/json">
-							${raw(JSON.stringify(statsByRuleUrl.get(ruleUrl)))}
-						</script>
-						<rf-plot-bar data-json-selector="#plot-data-${randomId}" data-days="${days}"></rf-plot-bar>
-					</section>
-					<!-- <footer></footer> -->
-				</article>
-			`;
-		})}
-	</section>`;
-}
+// 		${totalCountsSorted.map(([ruleUrl, totalCount]) => {
+// 			const randomId = nanoid();
+// 			return html`
+// 				<article>
+// 					<header><strong>${ruleUrl}</strong> • <em>(${totalCount})</em></header>
+// 					<section>
+// 						<script id="plot-data-${randomId}" type="application/json">
+// 							${raw(JSON.stringify(statsByRuleUrl.get(ruleUrl)))}
+// 						</script>
+// 						<rf-plot-bar data-json-selector="#plot-data-${randomId}" data-days="${days}"></rf-plot-bar>
+// 					</section>
+// 					<!-- <footer></footer> -->
+// 				</article>
+// 			`;
+// 		})}
+// 	</section>`;
+// }
 
 function CreateRuleForm() {
 	return html`
@@ -445,8 +440,8 @@ function Dashboard(props: {}) {
 				<!-- This input value is auto-injected by HTMX in the AJAX requests to the API. See helpers.js. -->
 				<input
 					type="text"
-					id="rf-api-key"
-					name="rf-api-key"
+					id="t-api-key"
+					name="t-api-key"
 					style="-webkit-text-security:disc"
 					hx-trigger="input"
 					hx-target="#redirection-rules-container"
@@ -462,8 +457,8 @@ function Dashboard(props: {}) {
 				<hr />
 				<div id="redirection-rules-container" hx-get="/-_-/ui/partials.ListRules" hx-trigger="load">
 					<p>
-						Paste your Rediflare-Api-Key in the above input box, or append it in the URL hash (e.g.
-						<code>#rfApiKey=rf_key_TENANT1111_sometoken</code>) to interact with your redirection rules.
+						Paste your Tiddlyflare-Api-Key in the above input box, or append it in the URL hash (e.g.
+						<code>#tApiKey=rf_key_TENANT1111_sometoken</code>) to interact with your redirection rules.
 					</p>
 				</div>
 			</section>
@@ -476,16 +471,15 @@ function Dashboard(props: {}) {
 						if (hashFragment) {
 							hashFragment = hashFragment.startsWith('#') ? hashFragment.substring(1) : hashFragment;
 							const params = new URLSearchParams(hashFragment);
-							const apiKey = params.get('rfApiKey')?.trim();
+							const apiKey = params.get('tApiKey')?.trim();
 							if (apiKey) {
-								document.querySelector('#rf-api-key').value = apiKey;
+								document.querySelector('#t-api-key').value = apiKey;
 							}
 						}
 					}
 					parseApiKeyFromHash();
 				})();
 			</script>
-			<script src="/-_-/ui/static/generated/dash-stats.js" defer></script>
 		</main>
 		<footer class="container">
 			${RediflareName()} is built by <a href="https://www.lambrospetrou.com" target="_blank">Lambros Petrou</a>. 🚀

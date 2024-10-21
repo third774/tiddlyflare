@@ -2,8 +2,8 @@
   "name": "rediflare",
   "version": "0.0.1",
   "scripts": {
-    "build:js:client:hashed": "esbuild --outdir=./public/ui/static/generated/ \"--loader:.js=jsx\" --bundle --minify-whitespace --format=iife --target=es6 --entry-names=[name].hashed.[hash] --metafile=esbuild-client.meta.json src/client/app.js src/client/dash-stats.js",
-    "build:js:client": "esbuild --outdir=./public/ui/static/generated/ \"--loader:.js=jsx\" --bundle --minify-whitespace --format=iife --target=es6 --entry-names=[name] --metafile=esbuild-client.meta.json src/client/app.js src/client/dash-stats.js",
+    "build:js:client:hashed": "esbuild --outdir=./public/ui/static/generated/ \"--loader:.js=jsx\" --bundle --minify-whitespace --format=iife --target=es6 --entry-names=[name].hashed.[hash] --metafile=esbuild-client.meta.json src/client/app.js",
+    "build:js:client": "esbuild --outdir=./public/ui/static/generated/ \"--loader:.js=jsx\" --bundle --minify-whitespace --format=iife --target=es6 --entry-names=[name] --metafile=esbuild-client.meta.json src/client/app.js",
     "predeploy": "npm run build:js:client",
     "deploy:staging": "npm run predeploy && wrangler deploy --env staging",
     "deploy:prod": "npm run predeploy && wrangler deploy --env prod",

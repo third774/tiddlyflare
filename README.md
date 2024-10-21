@@ -22,7 +22,7 @@ That's it! 🥳
 
 ## Authentication
 
-The API provided by the Worker is protected using the header `Tiddlyflare-Api-Key` that expects a string value of the format `tf_key_<TENANT_ID>_<TOKEN>`.
+The API provided by the Worker is protected using the header `Tiddlyflare-Api-Key` that expects a string value of the format `t_key_<TENANT_ID>_<TOKEN>`.
 
 The `TENANTID` should be non-empty and is used as sharding mechanism for the multi-tenancy aspects. Some of the multi-tenancy features are not implemented yet though.
 
