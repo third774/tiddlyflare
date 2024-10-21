@@ -89,6 +89,14 @@ app.post('/-_-/v1/wikis.Create', async (c) => {
 app.route('/', uiAdmin);
 app.route('/', uiAbout);
 
+app.get("/:wikiId/favicon.ico", async (c) => {
+	// Without this route, we fallback to the route below that always returns the full
+	// wiki which is crazy expensive for a favicon :)
+	// https://css-tricks.com/emoji-as-a-favicon/
+	c.res.headers.set("Content-Type", "image/svg+xml");
+	return c.body(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">✏️</text></svg>`);
+});
+
 app.get('/:wikiId/:name', async (c) => {
 	const { wikiId, name } = c.req.param();
 	console.log('GET ::', wikiId, name, c.req.method);
