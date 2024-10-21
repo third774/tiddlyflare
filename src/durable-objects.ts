@@ -181,7 +181,10 @@ export class WikiDO extends DurableObject {
 
 	fileSrc: Uint8Array | null = null;
 
-	_migrations?: SchemaMigrations;
+	_migrations: SchemaMigrations;
+
+	wikiId: string = '';
+	tenantId: string = '';
 
 	constructor(ctx: DurableObjectState, env: CfEnv) {
 		super(ctx, env);
@@ -189,17 +192,27 @@ export class WikiDO extends DurableObject {
 		this.storage = ctx.storage;
 		this.sql = ctx.storage.sql;
 
-		ctx.blockConcurrencyWhile(async () => {
-			this._migrations = new SchemaMigrations({
-				doStorage: ctx.storage,
-				migrations: WikiMigrations,
-			});
-
-			await this._migrations.runAll();
+		this._migrations = new SchemaMigrations({
+			doStorage: ctx.storage,
+			migrations: WikiMigrations,
 		});
+
+		// The WikiDO is referenced straight from the eyeball worker visiting URLs
+		// so in the constructor do not write anything to storage until we know it's a valid request.
+
+		const tableExists = this.sql.exec("SELECT name FROM sqlite_master WHERE name = 'wiki_info';").toArray().length > 0;
+		if (tableExists) {
+			const { tenantId, wikiId } = this.sql
+				.exec<{ tenantId: string; wikiId: string }>('SELECT tenantId, wikiId FROM wiki_info LIMIT 1')
+				.one();
+			this.tenantId = tenantId;
+			this.wikiId = wikiId;
+		}
 	}
 
 	async create(tenantId: string, wikiId: string, name: string, wikiType: WikiType) {
+		await this._migrations.runAll();
+
 		// Fetch the content of the wiki based on the wikiType.
 		switch (wikiType) {
 			case 'tw5':
@@ -218,7 +231,7 @@ export class WikiDO extends DurableObject {
 		// it on next visit.
 		this.sql.exec(`INSERT OR REPLACE INTO wiki_info VALUES (?, ?, ?, ?);`, wikiId, tenantId, name, wikiType);
 
-		const chunks = chunkify(this.fileSrc);
+		const chunks = chunkify(this.fileSrc, CHUNK_SIZE_MAX);
 
 		this.storage.transactionSync(() => {
 			for (let i = 0; i < chunks.length; i++) {
@@ -226,14 +239,23 @@ export class WikiDO extends DurableObject {
 			}
 		});
 
+		this.tenantId = tenantId;
+		this.wikiId = wikiId;
+
 		return {
 			ok: true,
 			redirectUrl: `/w/${wikiId}/${name}`,
 		};
 	}
 
+	// FIXME The PUT should be authenticated in the eyeball somehow since it's destructive!
 	async upsert(wikiId: string, bytesStream: ReadableStream, contentLength?: number) {
+		await this._migrations.runAll();
+
 		const tsMs = Date.now();
+
+		// Reset the in-memory cache to avoid inconsistencies if streaming is used.
+		this.fileSrc = null;
 
 		try {
 			// If we had contentLength provided and is less than our threshold then
@@ -374,9 +396,16 @@ export class WikiDO extends DurableObject {
 	}
 
 	async getFileSrc(wikiId: string): Promise<Response> {
+		if (!this.wikiId || this.wikiId != wikiId) {
+			// We do not have a valid wikiId, so this must be a random request.
+			return new Response('_|_', { status: 400 });
+		}
+
 		if (this.fileSrc) {
 			return this._makeStreamResponse(wikiId, this.fileSrc);
 		}
+
+		await this._migrations.runAll();
 
 		// FIXME Handle cases where somehow the file was not saved into SQLite.
 		// 		For this, in case there isn't any chunk written, we read the wiki_info row
