@@ -224,7 +224,7 @@ export class WikiDO extends DurableObject {
 
 		return {
 			ok: true,
-			redirectUrl: `${wikiId}/${name}`,
+			redirectUrl: `/w/${wikiId}/${name}`,
 		};
 	}
 
@@ -365,14 +365,14 @@ export async function routeCreateWiki(env: CfEnv, tenantId: string, name: string
 // 	return tenantStub.list();
 // }
 
-export async function routeWikiRequest(env: CfEnv, wikiId: string, name: string) {
+export async function routeWikiRequest(env: CfEnv, wikiId: string, _name: string) {
 	// Convert the hex ID back to the correct Durable Object ID.
 	let id: DurableObjectId = env.WIKI.idFromString(wikiId);
 	let stub = env.WIKI.get(id);
 	return stub.getFileSrc(wikiId);
 }
 
-export async function routeUpsertWiki(env: CfEnv, wikiId: string, name: string, bytes: ReadableStream) {
+export async function routeUpsertWiki(env: CfEnv, wikiId: string, _name: string, bytes: ReadableStream) {
 	let id: DurableObjectId = env.WIKI.idFromString(wikiId);
 	let wikiStub = env.WIKI.get(id);
 	try {
