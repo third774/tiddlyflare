@@ -124,6 +124,7 @@ app.put('/w/:wikiId/:name', async (c) => {
 			c.env,
 			wikiId,
 			name,
+			// Pass the body stream directly!
 			c.req.raw.body!,
 		);
 
