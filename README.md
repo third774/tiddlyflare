@@ -45,7 +45,7 @@ Then, once you have the above key run `npx wrangler secret put --env {staging,pr
 - Each tenant ID should be considered like an account/organization.
 - Each tenant can have multiple API keys (but the tenant ID portion should be the same across them to be considered as the same tenant).
 - Each tenant can have unlimited number of custom domains using the same deployment (Cloudflare limits apply, not application logic limits).
-- There is one database (SQLite in Durable Objects (DO)) per tenant for coordinating the creation/deletion of redirection rules. However, the actual URL visits are NOT bottlenecked by the single DO for the tenant. Each redirection rule lives in its own Durable Object and URL visits go straight to that DO from the edge workers.
+- There is one database (SQLite in Durable Objects (DO)) per tenant for coordinating the creation/deletion of wikis. However, each wiki is NOT bottlenecked by the single DO for the tenant. Each wiki lives in its own Durable Object and request to that wiki go straight to that DO from the edge workers.
 
 ## Custom domains
 
