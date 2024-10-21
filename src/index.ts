@@ -99,7 +99,17 @@ app.route('/', uiAbout);
 
 app.get('/:tenantId/:wikiId/:name', async (c) => {
 	const { tenantId, wikiId, name } = c.req.param();
-	console.log('GET ::', tenantId, wikiId, name);
+	console.log('GET ::', tenantId, wikiId, name, c.req.method);
+
+	// Hono handles HEAD methods as part of GET!
+
+	// Returning the stream causes issues with the runtime since nobody consumes it.
+	// Error: Uncaught (in promise) Error: Network connection lost.
+	// TODO Return ETag if we want.
+	if (c.req.method.toUpperCase() === "HEAD") {
+		return c.text("");
+	}
+
 	return routeWikiRequest(c.env, tenantId, wikiId, name);
 });
 
@@ -143,13 +153,6 @@ app.options('/:tenantId/:wikiId/:name', async (c) => {
 			dav: 'tw5/put',
 		},
 	});
-});
-
-app.on('HEAD', '/:tenantId/:wikiId/:name', async (c) => {
-	// console.log("BOOM :: HEAD");
-	// Satisfy the PUT Saver: https://github.com/TiddlyWiki/TiddlyWiki5/blob/646f5ae7cf2a46ccd298685af3228cfd14760e25/core/modules/savers/put.js#L58
-	// TODO Add ETag.
-	return c.text('ok');
 });
 
 app.all('/*', async (c) => {

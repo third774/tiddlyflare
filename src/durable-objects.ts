@@ -363,10 +363,15 @@ export async function routeCreateWiki(env: CfEnv, tenantId: string, name: string
 export async function routeUpsertWiki(env: CfEnv, tenantId: string, wikiId: string, name: string, bytes: ReadableStream) {
 	let id: DurableObjectId = env.WIKI.idFromString(wikiId);
 	let wikiStub = env.WIKI.get(id);
+	try {
 	const { ok } = await wikiStub.upsert(tenantId, wikiId, bytes);
 	if (!ok) {
 		throw new Error('could not save wiki');
 	}
+} catch(e) {
+	console.error("got it:", e);
+	throw e;
+}
 }
 
 // export async function routeDeleteUrlRedirect(request: Request, env: CfEnv, tenantId: string): Promise<ApiListRedirectRulesResponse> {
