@@ -79,7 +79,7 @@ complex information`;
 			</script>
 		</section>
 
-		<section style="margin-top: 3rem; max-width: 600px; margin-left: auto; margin-right: auto;">
+		<section style="margin-top: 3rem; max-width: 640px; margin-left: auto; margin-right: auto;">
 			<h4 class="text-center">Learn and understand TiddlyWiki</h4>
 			<ul style="text-align:left; font-size: 0.875rem;">
 				<li>Watch <a href="https://www.youtube.com/watch?v=vsdDs7oOLlg&ab_channel=SorenBjornstad" target="_blank">Experience TiddlyWiki Fluency: Creating a Reading List</a></li>
