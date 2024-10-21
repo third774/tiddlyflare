@@ -64,7 +64,7 @@ export class TenantDO extends DurableObject {
 	async _initTables(tenantId: string) {
 		const rowsData = await this._migrations!.runAll();
 		if (rowsData.rowsRead || rowsData.rowsWritten) {
-			console.info({ message: `Tenant schema migrations`, rowsRead: rowsData.rowsRead, rowsWritten: rowsData.rowsWritten });
+			console.info({ message: `TENANT: completed schema migrations`, rowsRead: rowsData.rowsRead, rowsWritten: rowsData.rowsWritten });
 		}
 		if (this.tenantId) {
 			if (this.tenantId !== tenantId) {
@@ -167,6 +167,8 @@ const WikiMigrations: SchemaMigration[] = [
 	},
 ];
 
+const RETAINED_VERSIONS_NUM = 10;
+
 export class WikiDO extends DurableObject {
 	env: CfEnv;
 	storage: DurableObjectStorage;
@@ -239,11 +241,28 @@ export class WikiDO extends DurableObject {
 						i + 1,
 						chunks.length
 					);
-					console.log({ rowsWritten, rowsRead });
+					console.log({ message: 'WIKI: INSERT INTO wiki_versions', rowsWritten, rowsRead });
 				}
 			});
 
-			// TODO Retain only the latest 10 versions, otherwise we would hit the DO storage limit of 1GB fast.
+			// Retain only the latest 10 versions, otherwise we would hit the DO storage limit of 1GB fast.
+			this.storage.transactionSync(() => {
+				const tss = this.sql
+					.exec('SELECT DISTINCT tsMs FROM wiki_versions WHERE wikiId = ? ORDER BY tsMs DESC LIMIT ?', wikiId, RETAINED_VERSIONS_NUM)
+					.toArray()
+					.map((row) => Number(row.tsMs));
+				if (tss.length < RETAINED_VERSIONS_NUM) {
+					console.log({ message: 'WIKI: skipping delete due to small number of versions' });
+					return;
+				}
+
+				const { rowsRead, rowsWritten } = this.sql.exec(
+					`DELETE FROM wiki_versions WHERE wikiId = ? AND tsMs < ?;`,
+					wikiId,
+					tss[tss.length - 1]
+				);
+				console.log({ message: 'WIKI: DELETE FROM wiki_versions', rowsWritten, rowsRead });
+			});
 		} catch (e) {
 			console.error({
 				message: 'failed to persist file upsert',

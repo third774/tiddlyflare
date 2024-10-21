@@ -9,7 +9,7 @@ Tiddlyflare-Api-Key: tf_key_TENANT1111_sometoken
     "wikiType": "tw5"
 }
 ```
-HTTP 200
+HTTP 201
 [Captures]
 wikiUrl: jsonpath "$.redirectUrl"
 
