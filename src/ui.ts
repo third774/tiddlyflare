@@ -25,7 +25,11 @@ uiAbout.get('/', async (c) => {
 });
 
 function AboutIndex() {
-	const heroSnippetCode = `TiddlyWiki ::\na non-linear personal web notebook`;
+	const heroSnippetCode = `TiddlyWiki ::
+
+a non-linear personal web notebook
+for capturing, organising and sharing
+complex information`;
 
 	return html`
 	<header class="about-header container">
