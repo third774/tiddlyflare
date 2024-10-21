@@ -164,30 +164,31 @@ complex information`;
 `;
 }
 
-uiAdmin.use('/-_-/ui/partials.*', async (c, next) => {
-	const tenantId = apiKeyAuth(c.env, c.req.raw);
-	c.set('tenantId', tenantId);
-	return next();
-});
+// uiAdmin.use('/-_-/ui/partials.*', async (c, next) => {
+// 	const tenantId = apiKeyAuth(c.env, c.req.raw);
+// 	c.set('tenantId', tenantId);
+// 	return next();
+// });
 
-uiAdmin.get('/-_-/ui/static/*', async (c) => {
-	const url = new URL(c.req.raw.url);
-	url.pathname = url.pathname.substring('/-_-'.length);
-	const req = new Request(url, c.req.raw);
-	return c.env.ASSETS.fetch(req);
-});
+// uiAdmin.get('/-_-/ui/static/*', async (c) => {
+// 	const url = new URL(c.req.raw.url);
+// 	// TODO Private assets should be hosted under `/cdn-cgi/`.
+// 	url.pathname = url.pathname.substring('/-_-'.length);
+// 	const req = new Request(url, c.req.raw);
+// 	return c.env.ASSETS.fetch(req);
+// });
 
-uiAdmin.get('/-_-/ui', async (c) => {
-	const main = Dashboard({});
-	return c.html(
-		Layout({
-			title: 'Tiddlyflare - Your own TiddlyWiki hosting platform.',
-			description: 'A TiddlyWiki hosting platform deployed in your own Cloudflare account.',
-			image: '',
-			children: main,
-		})
-	);
-});
+// uiAdmin.get('/-_-/ui', async (c) => {
+// 	const main = Dashboard({});
+// 	return c.html(
+// 		Layout({
+// 			title: 'Tiddlyflare - Your own TiddlyWiki hosting platform.',
+// 			description: 'A TiddlyWiki hosting platform deployed in your own Cloudflare account.',
+// 			image: '',
+// 			children: main,
+// 		})
+// 	);
+// });
 
 // uiAdmin.get('/-_-/ui/partials.ListRules', async (c) => {
 // 	const { data } = await routeListUrlRedirects(c.req.raw, c.env, c.var.tenantId);
@@ -394,105 +395,105 @@ uiAdmin.get('/-_-/ui', async (c) => {
 // 	</section>`;
 // }
 
-function CreateRuleForm() {
-	return html`
-		<form id="create-rule-container" action="#">
-			<hgroup>
-				<h3>Create new redirection rule</h3>
-				<p>Edit the JSON in the box below to your needs, but keep all the properties.</p>
-			</hgroup>
-			<textarea id="new-rule-json" name="newRuleJson" rows="6">
-{
-"ruleUrl": "http://127.0.0.1:8787/test-rule-11",
-"responseStatus": 302,
-"responseLocation": "https://skybear.net",
-"responseHeaders": [["X-Powered-By", "Rediflare"]]
-}</textarea
-			>
-			<button hx-post="/-_-/ui/partials.CreateRule" hx-include="#new-rule-json" hx-target="#create-rule-container" hx-swap="outerHTML">
-				Create redirection rule
-			</button>
-		</form>
-	`;
-}
+// function CreateRuleForm() {
+// 	return html`
+// 		<form id="create-rule-container" action="#">
+// 			<hgroup>
+// 				<h3>Create new redirection rule</h3>
+// 				<p>Edit the JSON in the box below to your needs, but keep all the properties.</p>
+// 			</hgroup>
+// 			<textarea id="new-rule-json" name="newRuleJson" rows="6">
+// {
+// "ruleUrl": "http://127.0.0.1:8787/test-rule-11",
+// "responseStatus": 302,
+// "responseLocation": "https://skybear.net",
+// "responseHeaders": [["X-Powered-By", "Rediflare"]]
+// }</textarea
+// 			>
+// 			<button hx-post="/-_-/ui/partials.CreateRule" hx-include="#new-rule-json" hx-target="#create-rule-container" hx-swap="outerHTML">
+// 				Create redirection rule
+// 			</button>
+// 		</form>
+// 	`;
+// }
 
-function Dashboard(props: {}) {
-	const createRuleForm = CreateRuleForm();
-	return html`
-		<header class="container">
-			<nav>
-				<ul>
-					<li>
-						<h1 style="margin-bottom: 0"><a href="https://tiddly.lambros.dev" class="contrast">${RediflareName()}</a></h1>
-					</li>
-				</ul>
-				<ul>
-					<!-- <li><a href="https://developers.cloudflare.com/durable-objects/" class="contrast">Durable Objects</a></li> -->
-					<li>
-						<a href="https://github.com/lambrospetrou/tiddlyflare" target="_blank"><button class="contrast">Github repo</button></a>
-					</li>
-				</ul>
-			</nav>
-		</header>
+// function Dashboard(props: {}) {
+// 	const createRuleForm = CreateRuleForm();
+// 	return html`
+// 		<header class="container">
+// 			<nav>
+// 				<ul>
+// 					<li>
+// 						<h1 style="margin-bottom: 0"><a href="https://tiddly.lambros.dev" class="contrast">${RediflareName()}</a></h1>
+// 					</li>
+// 				</ul>
+// 				<ul>
+// 					<!-- <li><a href="https://developers.cloudflare.com/durable-objects/" class="contrast">Durable Objects</a></li> -->
+// 					<li>
+// 						<a href="https://github.com/lambrospetrou/tiddlyflare" target="_blank"><button class="contrast">Github repo</button></a>
+// 					</li>
+// 				</ul>
+// 			</nav>
+// 		</header>
 
-		<main class="container">
-			<section>
-				<hgroup>
-					<h2>Rediflare-Api-Key</h2>
-					<p>Paste your API key to enable the page to fetch your data.</p>
-				</hgroup>
-				<!-- This input value is auto-injected by HTMX in the AJAX requests to the API. See helpers.js. -->
-				<input
-					type="text"
-					id="t-api-key"
-					name="t-api-key"
-					style="-webkit-text-security:disc"
-					hx-trigger="input"
-					hx-target="#redirection-rules-container"
-					hx-get="/-_-/ui/partials.ListRules"
-					hx-params="none"
-				/>
-			</section>
+// 		<main class="container">
+// 			<section>
+// 				<hgroup>
+// 					<h2>Rediflare-Api-Key</h2>
+// 					<p>Paste your API key to enable the page to fetch your data.</p>
+// 				</hgroup>
+// 				<!-- This input value is auto-injected by HTMX in the AJAX requests to the API. See helpers.js. -->
+// 				<input
+// 					type="text"
+// 					id="t-api-key"
+// 					name="t-api-key"
+// 					style="-webkit-text-security:disc"
+// 					hx-trigger="input"
+// 					hx-target="#redirection-rules-container"
+// 					hx-get="/-_-/ui/partials.ListRules"
+// 					hx-params="none"
+// 				/>
+// 			</section>
 
-			<section>
-				<h2>Redirection Rules</h2>
+// 			<section>
+// 				<h2>Redirection Rules</h2>
 
-				${createRuleForm}
-				<hr />
-				<div id="redirection-rules-container" hx-get="/-_-/ui/partials.ListRules" hx-trigger="load">
-					<p>
-						Paste your Tiddlyflare-Api-Key in the above input box, or append it in the URL hash (e.g.
-						<code>#tApiKey=rf_key_TENANT1111_sometoken</code>) to interact with your redirection rules.
-					</p>
-				</div>
-			</section>
+// 				${createRuleForm}
+// 				<hr />
+// 				<div id="redirection-rules-container" hx-get="/-_-/ui/partials.ListRules" hx-trigger="load">
+// 					<p>
+// 						Paste your Tiddlyflare-Api-Key in the above input box, or append it in the URL hash (e.g.
+// 						<code>#tApiKey=rf_key_TENANT1111_sometoken</code>) to interact with your redirection rules.
+// 					</p>
+// 				</div>
+// 			</section>
 
-			<script type="text/javascript">
-				(function () {
-					// Auto load the api key if it's in the hash section of the URL.
-					function parseApiKeyFromHash() {
-						let hashFragment = window.location.hash?.trim();
-						if (hashFragment) {
-							hashFragment = hashFragment.startsWith('#') ? hashFragment.substring(1) : hashFragment;
-							const params = new URLSearchParams(hashFragment);
-							const apiKey = params.get('tApiKey')?.trim();
-							if (apiKey) {
-								document.querySelector('#t-api-key').value = apiKey;
-							}
-						}
-					}
-					parseApiKeyFromHash();
-				})();
-			</script>
-		</main>
-		<footer class="container">
-			${RediflareName()} is built by <a href="https://www.lambrospetrou.com" target="_blank">Lambros Petrou</a>. 🚀
-		</footer>
-	`;
-}
+// 			<script type="text/javascript">
+// 				(function () {
+// 					// Auto load the api key if it's in the hash section of the URL.
+// 					function parseApiKeyFromHash() {
+// 						let hashFragment = window.location.hash?.trim();
+// 						if (hashFragment) {
+// 							hashFragment = hashFragment.startsWith('#') ? hashFragment.substring(1) : hashFragment;
+// 							const params = new URLSearchParams(hashFragment);
+// 							const apiKey = params.get('tApiKey')?.trim();
+// 							if (apiKey) {
+// 								document.querySelector('#t-api-key').value = apiKey;
+// 							}
+// 						}
+// 					}
+// 					parseApiKeyFromHash();
+// 				})();
+// 			</script>
+// 		</main>
+// 		<footer class="container">
+// 			${RediflareName()} is built by <a href="https://www.lambrospetrou.com" target="_blank">Lambros Petrou</a>. 🚀
+// 		</footer>
+// 	`;
+// }
 
 function Layout(props: { title: string; description: string; image: string; children?: any }) {
-	const image = props.image || 'https://go.rediflare.com/ui/static/20240929T1559-B3S2MSGffh.png';
+	const image = props.image || 'https://tiddly.lambros.dev/ui/static/20241021T0955-iCUuAnWTud.png';
 	return html`
 		<html>
 			<head>
@@ -512,7 +513,7 @@ function Layout(props: { title: string; description: string; image: string; chil
 
 				<meta name="htmx-config" content='{"withCredentials":true,"globalViewTransitions": true,"selfRequestsOnly": false}' />
 
-				<link rel="stylesheet" href="/-_-/ui/static/pico.v2.0.6.red.min.css" />
+				<link rel="stylesheet" href="/ui/static/pico.v2.0.6.red.min.css" />
 				<style>
 					:root {
 						--pico-form-element-spacing-vertical: 0.75rem;
@@ -532,8 +533,8 @@ function Layout(props: { title: string; description: string; image: string; chil
 			<body>
 				${props.children}
 
-				<script src="/-_-/ui/static/htmx.2.0.2.min.js" defer></script>
-				<script src="/-_-/ui/static/generated/app.js" defer></script>
+				<script src="/ui/static/htmx.2.0.2.min.js" defer></script>
+				<script src="/ui/static/generated/app.js" defer></script>
 			</body>
 		</html>
 	`;
