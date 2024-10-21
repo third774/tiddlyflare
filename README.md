@@ -60,7 +60,7 @@ routes = [
 ]
 ```
 
-Fun fact, with Rediflare it's not the domain that decides the "account used" but the `TENANT_ID` part of the API key (see previous section).
+Fun fact, with Tiddlyflare it's not the domain that decides the "account used" but the `TENANT_ID` part of the API key (see previous section).
 
 So, as long as you use the same API key, accessing the `/-_-/ui/` admin UI from any of your custom domains is exactly the same.
 
