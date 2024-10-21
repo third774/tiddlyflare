@@ -231,12 +231,12 @@ export class WikiDO extends DurableObject {
 	async upsert(wikiId: string, bytesStream: ReadableStream) {
 		const tsMs = Date.now();
 
-		// TODO Do chunking and storing in SQLite directly, to avoid buffering the whole payload!
-		// https://github.com/lambrospetrou/tiddlyflare/issues/2
-		const bytes = await new Response(bytesStream).bytes();
-		const chunks = chunkify(bytes);
-
 		try {
+			// TODO Do chunking and storing in SQLite directly, to avoid buffering the whole payload!
+			// https://github.com/lambrospetrou/tiddlyflare/issues/2
+			const bytes = await new Response(bytesStream).bytes();
+			const chunks = chunkify(bytes);
+
 			this.storage.transactionSync(() => {
 				for (let i = 0; i < chunks.length; i++) {
 					const { rowsRead, rowsWritten } = this.sql.exec(
@@ -250,6 +250,8 @@ export class WikiDO extends DurableObject {
 					console.log({ message: 'WIKI: INSERT INTO wiki_versions', rowsWritten, rowsRead });
 				}
 			});
+
+			this.fileSrc = bytes;
 
 			// Retain only the latest 10 versions, otherwise we would hit the DO storage limit of 1GB fast.
 			this.storage.transactionSync(() => {
@@ -279,8 +281,6 @@ export class WikiDO extends DurableObject {
 			throw e;
 		}
 
-		this.fileSrc = bytes;
-
 		return { ok: true };
 	}
 
@@ -304,8 +304,9 @@ export class WikiDO extends DurableObject {
 				ORDER BY tsMs DESC
 				LIMIT 1;`,
 				wikiId
-			).one();
-		console.log({ message: "WIKI: chunks info", chunksInfo });
+			)
+			.one();
+		console.log({ message: 'WIKI: chunks info', chunksInfo });
 
 		// Get a cursor to the chunks, and we decide later if we will read all of them
 		// at once, or stream them out gradually.
@@ -348,17 +349,22 @@ export class WikiDO extends DurableObject {
 					src: ArrayBuffer;
 			  }>
 	): Response {
+		let cancelled = false;
+		let chunksLen = 0;
+		let totalBytes = 0;
 		return new Response(
 			new ReadableStream({
 				start(controller) {
-					let chunksLen = 0,
-						totalBytes = 0;
+					
 					if (chunksCursor instanceof Uint8Array) {
 						controller.enqueue(chunksCursor);
 						chunksLen = 1;
 						totalBytes = chunksCursor.byteLength;
 					} else {
 						for (const chunk of chunksCursor) {
+							if (cancelled) {
+								break;
+							}
 							const arr = new Uint8Array(chunk.src);
 							controller.enqueue(arr);
 							chunksLen += 1;
@@ -366,7 +372,13 @@ export class WikiDO extends DurableObject {
 						}
 					}
 					controller.close();
-					console.log({ message: 'WIKI: GET stream', chunksLen, totalBytes });
+					console.log({ message: 'WIKI: _makeStreamResponse', chunksLen, totalBytes });
+				},
+				cancel() {
+					// This is called if the reader cancels,
+					// so we should stop generating strings
+					cancelled = true;
+					console.log({ message: 'WIKI: _makeStreamResponse cancelled', chunksLen, totalBytes });
 				},
 			}),
 			{
