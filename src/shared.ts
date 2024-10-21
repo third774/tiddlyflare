@@ -2,6 +2,7 @@ import { HTTPException } from 'hono/http-exception';
 import { CfEnv } from './durable-objects';
 import { customAlphabet } from 'nanoid';
 
+// No vowels to avoid "nice" words.
 export const genId = customAlphabet('0123456789BCDFGHJKLMNPQRSTVWXZbcdfghjklmnpqrstvwxz', 32);
 
 export function chunkify(bb: Uint8Array): Uint8Array[] {
@@ -9,8 +10,8 @@ export function chunkify(bb: Uint8Array): Uint8Array[] {
 	const chunkSz = 1_500_000;
 	const chunks = new Array(Math.ceil(bb.length / chunkSz));
 	let readidx = 0;
-	for (let i=0; i<chunks.length; i++) {
-		const end = Math.min(readidx+chunkSz, bb.length);
+	for (let i = 0; i < chunks.length; i++) {
+		const end = Math.min(readidx + chunkSz, bb.length);
 		chunks[i] = bb.subarray(readidx, end);
 		readidx = end;
 	}
@@ -20,7 +21,7 @@ export function chunkify(bb: Uint8Array): Uint8Array[] {
 export function mergeArrayBuffers(chunks: ArrayBuffer[]): Uint8Array {
 	const arr = new Uint8Array(chunks.reduce((acc, b) => acc + b.byteLength, 0));
 	let writeidx = 0;
-	for (let i=0; i<chunks.length; i++) {
+	for (let i = 0; i < chunks.length; i++) {
 		arr.set(new Uint8Array(chunks[i]), writeidx);
 		writeidx += chunks[i].byteLength;
 	}

@@ -2,7 +2,6 @@ import { Hono } from 'hono/tiny';
 import { HTTPException } from 'hono/http-exception';
 import { requestId } from 'hono/request-id';
 import { logger } from 'hono/logger';
-import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 
 import { CfEnv, routeWikiRequest, routeCreateWiki, routeUpsertWiki } from './durable-objects';
@@ -29,16 +28,8 @@ app.onError((e, c) => {
 
 app.use('*', requestId());
 app.use(logger());
-// TiddlyWiki is several MBs.
-// app.use(
-// 	bodyLimit({
-// 		maxSize: 10 * 1024, // 10kb
-// 		onError: (c) => {
-// 			return c.text('overflow :(', 413);
-// 		},
-// 	})
-// );
 
+// CORS swallows the OPTIONS requests for the PUT Saver, so restrict it to the API.
 app.use(
 	'/-_-/v1/*',
 	cors({
@@ -86,7 +77,8 @@ app.post('/-_-/v1/wikis.Create', async (c) => {
 	}
 
 	const respData = await routeCreateWiki(c.env, c.var.tenantId, params.name, params.wikiType);
-	return Response.json(respData);
+	c.res.headers.set('X-Powered-By', 'Tiddlyflare');
+	return c.json(respData, 201);
 });
 
 // app.post('/-_-/v1/redirects.Delete', async (c) => {
@@ -101,15 +93,16 @@ app.get('/:tenantId/:wikiId/:name', async (c) => {
 	const { tenantId, wikiId, name } = c.req.param();
 	console.log('GET ::', tenantId, wikiId, name, c.req.method);
 
+	c.res.headers.set('X-Powered-By', 'Tiddlyflare');
+
 	// Hono handles HEAD methods as part of GET!
 
 	// Returning the stream causes issues with the runtime since nobody consumes it.
 	// Error: Uncaught (in promise) Error: Network connection lost.
 	// TODO Return ETag if we want.
-	if (c.req.method.toUpperCase() === "HEAD") {
-		return c.text("");
+	if (c.req.method.toUpperCase() === 'HEAD') {
+		return c.text('');
 	}
-
 	return routeWikiRequest(c.env, tenantId, wikiId, name);
 });
 
@@ -129,10 +122,11 @@ app.put('/:tenantId/:wikiId/:name', async (c) => {
 					controller.enqueue(bytes);
 					controller.close();
 				},
-			}),
+			})
 		);
 
 		// TODO Add ETag.
+		c.res.headers.set('X-Powered-By', 'Tiddlyflare');
 		return c.text('ok');
 	} catch (e) {
 		console.error({
@@ -149,6 +143,7 @@ app.options('/:tenantId/:wikiId/:name', async (c) => {
 	// Satisfy the PUT Saver: https://github.com/TiddlyWiki/TiddlyWiki5/blob/646f5ae7cf2a46ccd298685af3228cfd14760e25/core/modules/savers/put.js#L58
 	return c.text('ok', {
 		headers: {
+			'X-Powered-By': 'Tiddlyflare',
 			Allow: 'GET,HEAD,POST,OPTIONS,CONNECT,PUT,DAV,dav',
 			dav: 'tw5/put',
 		},
@@ -156,7 +151,7 @@ app.options('/:tenantId/:wikiId/:name', async (c) => {
 });
 
 app.all('/*', async (c) => {
-	return new Response('_|_', {
+	return c.text('_|_', {
 		headers: {
 			'X-Powered-By': 'Tiddlyflare',
 		},

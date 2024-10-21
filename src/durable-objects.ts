@@ -1,8 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
-import { ApiListRedirectRulesResponse, ApiRedirectRuleStatsAggregated, WikiType } from './types';
+import { WikiType } from './types';
 import { SchemaMigration, SchemaMigrations } from './sql-migrations';
-import { nanoid } from 'nanoid';
-import { chunkify, genId, mergeArrayBuffers } from './shared';
+import { chunkify, mergeArrayBuffers } from './shared';
 
 export interface CfEnv {
 	TENANT: DurableObjectNamespace<TenantDO>;
@@ -67,8 +66,6 @@ export class TenantDO extends DurableObject {
 		if (rowsData.rowsRead || rowsData.rowsWritten) {
 			console.info({ message: `Tenant schema migrations`, rowsRead: rowsData.rowsRead, rowsWritten: rowsData.rowsWritten });
 		}
-
-		console.log('BOOM :: ', tenantId, this.tenantId);
 		if (this.tenantId) {
 			if (this.tenantId !== tenantId) {
 				throw new Error(`wrong tenant ID [${tenantId}] on the wrong Tenant [${this.tenantId}]`);
@@ -196,8 +193,6 @@ export class WikiDO extends DurableObject {
 	}
 
 	async create(tenantId: string, wikiId: string, name: string, wikiType: WikiType) {
-		// console.log('BOOM :: REDIRECT_RULE :: UPSERT', tenantId, ruleUrl, responseStatus);
-
 		// Fetch the content of the wiki based on the wikiType.
 		switch (wikiType) {
 			case 'tw5':
@@ -221,8 +216,6 @@ export class WikiDO extends DurableObject {
 			}
 		});
 
-		// console.log('upsert DO redirect rule', JSON.stringify({ rules: [...this.rules.entries()] }));
-
 		return {
 			ok: true,
 			redirectUrl: `${tenantId}/${wikiId}/${name}`,
@@ -230,8 +223,6 @@ export class WikiDO extends DurableObject {
 	}
 
 	async upsert(_tenantId: string, wikiId: string, bytesStream: ReadableStream) {
-		// console.log('BOOM :: REDIRECT_RULE :: UPSERT', tenantId, ruleUrl, responseStatus);
-
 		const tsMs = Date.now();
 
 		const bytes = await new Response(bytesStream).bytes();
@@ -251,6 +242,8 @@ export class WikiDO extends DurableObject {
 					console.log({ rowsWritten, rowsRead });
 				}
 			});
+
+			// TODO Retain only the latest 10 versions, otherwise we would hit the DO storage limit of 1GB fast.
 		} catch (e) {
 			console.error({
 				message: 'failed to persist file upsert',
@@ -260,8 +253,6 @@ export class WikiDO extends DurableObject {
 		}
 
 		this.fileSrc = bytes;
-
-		// console.log('upsert DO redirect rule', JSON.stringify({ rules: [...this.rules.entries()] }));
 
 		return { ok: true };
 	}
@@ -326,15 +317,6 @@ export class WikiDO extends DurableObject {
 // Utils
 /////////
 
-function ruleUrlFromEyeballRequest(request: Request) {
-	const url = new URL(request.url);
-	return `${url.origin}${url.pathname}`;
-}
-
-function stubIdForRuleFromRequest(request: Request) {
-	return ruleUrlFromEyeballRequest(request);
-}
-
 /////////////////////////////////////////////////////////////////
 // API Handlers
 ////////////////
@@ -364,14 +346,14 @@ export async function routeUpsertWiki(env: CfEnv, tenantId: string, wikiId: stri
 	let id: DurableObjectId = env.WIKI.idFromString(wikiId);
 	let wikiStub = env.WIKI.get(id);
 	try {
-	const { ok } = await wikiStub.upsert(tenantId, wikiId, bytes);
-	if (!ok) {
-		throw new Error('could not save wiki');
+		const { ok } = await wikiStub.upsert(tenantId, wikiId, bytes);
+		if (!ok) {
+			throw new Error('could not save wiki');
+		}
+	} catch (e) {
+		console.error('WIKI failed to upsert:', e);
+		throw new Error('WIKI failed to save your updates');
 	}
-} catch(e) {
-	console.error("got it:", e);
-	throw e;
-}
 }
 
 // export async function routeDeleteUrlRedirect(request: Request, env: CfEnv, tenantId: string): Promise<ApiListRedirectRulesResponse> {
