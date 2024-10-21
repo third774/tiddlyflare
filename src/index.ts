@@ -99,7 +99,7 @@ app.get("/w/:wikiId/favicon.ico", async (c) => {
 
 app.get('/w/:wikiId/:name', async (c) => {
 	const { wikiId, name } = c.req.param();
-	console.log('GET ::', wikiId, name, c.req.method);
+	// console.log('GET ::', wikiId, name, c.req.method);
 
 	c.res.headers.set('X-Powered-By', 'Tiddlyflare');
 
@@ -116,7 +116,7 @@ app.get('/w/:wikiId/:name', async (c) => {
 
 app.put('/w/:wikiId/:name', async (c) => {
 	const { wikiId, name } = c.req.param();
-	console.log('PUT ::', wikiId, name);
+	// console.log('PUT ::', wikiId, name);
 
 	try {
 		// const bytes = await c.req.raw.bytes();
