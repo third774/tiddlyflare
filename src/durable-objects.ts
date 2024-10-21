@@ -294,6 +294,9 @@ export class WikiDO extends DurableObject {
 			}
 		}
 
+		// TODO Check if it's faster here to return a ReadableStream and in the controller 
+		// return each chunk gradually, vs merging and returning the whole thing.
+		// This will also avoid hitting memory limits where we hit the 128MB total memory.
 		this.fileSrc = mergeArrayBuffers(chunks);
 
 		return this._makeStreamResponse(this.fileSrc);
