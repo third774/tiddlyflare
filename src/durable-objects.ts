@@ -240,16 +240,15 @@ export class WikiDO extends DurableObject {
 		try {
 			this.storage.transactionSync(() => {
 				for (let i = 0; i < chunks.length; i++) {
-					console.log({
-						res: this.sql.exec(
-							`INSERT OR REPLACE INTO wiki_versions VALUES (?, ?, ?, ?, ?);`,
-							wikiId,
-							tsMs,
-							chunks[i],
-							i + 1,
-							chunks.length
-						).rowsWritten,
-					});
+					const { rowsRead, rowsWritten } = this.sql.exec(
+						`INSERT OR REPLACE INTO wiki_versions VALUES (?, ?, ?, ?, ?);`,
+						wikiId,
+						tsMs,
+						chunks[i],
+						i + 1,
+						chunks.length
+					);
+					console.log({ rowsWritten, rowsRead });
 				}
 			});
 		} catch (e) {
@@ -364,7 +363,10 @@ export async function routeCreateWiki(env: CfEnv, tenantId: string, name: string
 export async function routeUpsertWiki(env: CfEnv, tenantId: string, wikiId: string, name: string, bytes: ReadableStream) {
 	let id: DurableObjectId = env.WIKI.idFromString(wikiId);
 	let wikiStub = env.WIKI.get(id);
-	return wikiStub.upsert(tenantId, wikiId, bytes);
+	const { ok } = await wikiStub.upsert(tenantId, wikiId, bytes);
+	if (!ok) {
+		throw new Error('could not save wiki');
+	}
 }
 
 // export async function routeDeleteUrlRedirect(request: Request, env: CfEnv, tenantId: string): Promise<ApiListRedirectRulesResponse> {

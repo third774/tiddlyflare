@@ -109,7 +109,7 @@ app.put('/:tenantId/:wikiId/:name', async (c) => {
 	console.log('PUT :: ', tenantId, wikiId, name, bytes.length);
 
 	try {
-		const { ok } = await routeUpsertWiki(
+		await routeUpsertWiki(
 			c.env,
 			tenantId,
 			wikiId,
@@ -119,11 +119,8 @@ app.put('/:tenantId/:wikiId/:name', async (c) => {
 					controller.enqueue(bytes);
 					controller.close();
 				},
-			})
+			}),
 		);
-		if (!ok) {
-			throw new Error('could not save wiki');
-		}
 
 		// TODO Add ETag.
 		return c.text('ok');
