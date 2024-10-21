@@ -1,6 +1,6 @@
 # Tiddlyflare
 
-Your own self-hosted Tiddlywiki hosting platform.
+Your own self-hosted [TiddlyWiki](https://tiddlywiki.com/) hosting platform.
 
 Built with [Cloudflare Workers](https://developers.cloudflare.com/workers/) and [Durable Objects](https://developers.cloudflare.com/durable-objects/), specifically the [SQLite in DO](https://blog.cloudflare.com/sqlite-in-durable-objects/) variant.
 
@@ -38,7 +38,7 @@ $ npm run --silent gen:apikey
 rf_key_dP1gH07gDCnWwql9HrwPshZzsQfxCCgh_vm6PT3RH5fK37hS8fl6B5NlRJ8M460dKD4qS
 ```
 
-Then, once you have the above key run `npx wrangler secret put VAR_API_AUTH_ADMIN_KEYS_CSV` to store it in your worker (you will need to paste it after prompted), or just create it through the Cloudflare dashboard.
+Then, once you have the above key run `npx wrangler secret put --env {staging,prod,dev} VAR_API_AUTH_ADMIN_KEYS_CSV` to store it in your worker (you will need to paste it after prompted), or just create it through the Cloudflare dashboard.
 
 ### Tenant ID
 
