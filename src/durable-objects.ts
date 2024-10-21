@@ -259,15 +259,16 @@ export class WikiDO extends DurableObject {
 
 				this.storage.transactionSync(() => {
 					for (let i = 0; i < chunks.length; i++) {
+						const chunkIdx = i+1;
 						const { rowsRead, rowsWritten } = this.sql.exec(
 							`INSERT OR REPLACE INTO wiki_versions VALUES (?, ?, ?, ?, ?);`,
 							wikiId,
 							tsMs,
 							chunks[i],
-							i + 1,
+							chunkIdx,
 							chunks.length
 						);
-						console.log({ message: 'WIKI: INSERT INTO wiki_versions', wikiId, tsMs, chunkIdx: i, rowsWritten, rowsRead });
+						console.log({ message: 'WIKI: INSERT INTO wiki_versions', wikiId, tsMs, chunkIdx, rowsWritten, rowsRead });
 					}
 				});
 
