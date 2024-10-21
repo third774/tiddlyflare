@@ -69,7 +69,7 @@ complex information`;
 		</section>
 
 		<section class="text-center">
-			<p><code><span class="self-window-location-domain">tiddly-staging.lambros.dev</span></code> uses ${RediflareName()} hosting platform for <a href="https://tiddlywiki.com" target="_blank">TiddlyWiki</a>.</p>
+			<p><code><span class="self-window-location-domain">tiddly-staging.lambros.dev</span></code> uses the ${RediflareName()} hosting platform for <a href="https://tiddlywiki.com" target="_blank">TiddlyWiki</a>.</p>
 			<p><a href="https://github.com/lambrospetrou/tiddlyflare/fork"><button>Fork the repository ➜ <code>npm run deploy:prod</code></button></a></p>
 
 			<script>
@@ -77,6 +77,15 @@ complex information`;
 				document.querySelectorAll(".self-window-location-domain").forEach(n => n.innerHTML = window.location.host ?? "tiddly.lambros.dev");
 			})()
 			</script>
+		</section>
+
+		<section style="margin-top: 3rem; max-width: 600px; margin-left: auto; margin-right: auto;">
+			<h4 class="text-center">Learn and understand TiddlyWiki</h4>
+			<ul style="text-align:left; font-size: 0.875rem;">
+				<li>Watch <a href="https://www.youtube.com/watch?v=vsdDs7oOLlg&ab_channel=SorenBjornstad" target="_blank">Experience TiddlyWiki Fluency: Creating a Reading List</a></li>
+				<li>Read <a href="https://groktiddlywiki.com/read/" target="_blank">Grok TiddlyWiki - Build a deep, lasting understanding of TiddlyWiki</a></li>
+				<li>Visit the <a href="https://tiddlywiki.com" target="_blank">TiddlyWiki homepage</a></li>
+			</ul>
 		</section>
 	</main>
 
