@@ -289,25 +289,40 @@ export class WikiDO extends DurableObject {
 			return this._makeStreamResponse(this.fileSrc);
 		}
 
-		const row = this.sql.exec(`SELECT * FROM wiki_versions WHERE wikiId = ? ORDER BY tsMs DESC LIMIT 1;`, wikiId).one();
-		const sz = Number(row.chunksTotal);
-		const chunks = new Array<ArrayBuffer>(sz);
-		for (let i = 0; i < sz; i++) {
-			if (i === row.chunkIdx) {
-				chunks[row.chunkIdx as number] = row.src as ArrayBuffer;
-			} else {
-				chunks[i] = this.sql
-					.exec(`SELECT * FROM wiki_versions WHERE wikiId = ? AND tsMs = ? AND chunkIdx = ?;`, wikiId, row.tsMs, i + 1)
-					.one().src as ArrayBuffer;
-			}
+		// TODO Handle cases where somehow the file was not saved into SQLite.
+
+		// Find which chunks to read.
+		const chunksInfo = this.sql
+			.exec<{
+				tsMs: number;
+				chunksLen: number;
+			}>(
+				`
+				SELECT MAX(tsMs) as tsMs, COUNT(1) as chunksLen
+				FROM wiki_versions WHERE wikiId = ?
+				GROUP BY tsMs
+				ORDER BY tsMs DESC
+				LIMIT 1;`,
+				wikiId
+			).one();
+		console.log({ message: "WIKI: chunks info", chunksInfo });
+
+		// Get a cursor to the chunks, and we decide later if we will read all of them
+		// at once, or stream them out gradually.
+		const chunksCursor = this.sql.exec<{ src: ArrayBuffer }>(
+			`SELECT src FROM wiki_versions WHERE wikiId = ? AND tsMs = ? ORDER BY tsMs ASC;`,
+			wikiId,
+			chunksInfo.tsMs
+		);
+
+		// Optimization: If we have less than 5 chunks (<10MB), then keep the whole file in-memory,
+		// otherwise we always go back to the database to read the chunks.
+		if (chunksInfo.chunksLen < 5) {
+			this.fileSrc = mergeArrayBuffers(chunksCursor.toArray().map((c) => c.src));
+			return this._makeStreamResponse(this.fileSrc);
 		}
-
-		// TODO Check if it's faster here to return a ReadableStream and in the controller
-		// return each chunk gradually, vs merging and returning the whole thing.
-		// This will also avoid hitting memory limits where we hit the 128MB total memory.
-		this.fileSrc = mergeArrayBuffers(chunks);
-
-		return this._makeStreamResponse(this.fileSrc);
+		// Fallback to streaming each chunk without storing it all in memory.
+		return this._makeStreamResponse(chunksCursor);
 	}
 
 	async deleteAll() {
@@ -326,12 +341,32 @@ export class WikiDO extends DurableObject {
 		return String(this.sql.exec('SELECT tenantId FROM wiki_info LIMIT 1;').one().tenantId);
 	}
 
-	_makeStreamResponse(b: Uint8Array): Response {
+	_makeStreamResponse(
+		chunksCursor:
+			| Uint8Array
+			| SqlStorageCursor<{
+					src: ArrayBuffer;
+			  }>
+	): Response {
 		return new Response(
 			new ReadableStream({
 				start(controller) {
-					controller.enqueue(b);
+					let chunksLen = 0,
+						totalBytes = 0;
+					if (chunksCursor instanceof Uint8Array) {
+						controller.enqueue(chunksCursor);
+						chunksLen = 1;
+						totalBytes = chunksCursor.byteLength;
+					} else {
+						for (const chunk of chunksCursor) {
+							const arr = new Uint8Array(chunk.src);
+							controller.enqueue(arr);
+							chunksLen += 1;
+							totalBytes += arr.byteLength;
+						}
+					}
 					controller.close();
+					console.log({ message: 'WIKI: GET stream', chunksLen, totalBytes });
 				},
 			}),
 			{
