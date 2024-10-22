@@ -15,4 +15,4 @@ const tenantId = nanoid(32);
 const token = nanoid(36);
 
 // After printing this, add it in your Worker with `npx wrangler secret put VAR_API_AUTH_ADMIN_KEYS_CSV`.
-console.log(`tf_key_${tenantId}_${token}`);
+console.log(`t_key_${tenantId}_${token}`);
