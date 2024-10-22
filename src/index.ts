@@ -47,11 +47,6 @@ app.use('/-_-/v1/*', async (c, next) => {
 	return next();
 });
 
-// app.get('/-_-/v1/redirects.List', async (c) => {
-// 	const respData = await routeListUrlRedirects(c.req.raw, c.env, c.var.tenantId);
-// 	return Response.json(respData);
-// });
-
 app.post('/-_-/v1/wikis.Create', async (c) => {
 	interface Params {
 		name: string;
