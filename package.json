@@ -1,5 +1,5 @@
 {
-  "name": "rediflare",
+  "name": "tiddlyflare",
   "version": "0.0.1",
   "scripts": {
     "build:js:client:hashed": "esbuild --outdir=./public/ui/static/generated/ \"--loader:.js=jsx\" --bundle --minify-whitespace --format=iife --target=es6 --entry-names=[name].hashed.[hash] --metafile=esbuild-client.meta.json src/client/app.js",
