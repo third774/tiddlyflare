@@ -62,13 +62,13 @@ routes = [
 
 Fun fact, with Tiddlyflare it's not the domain that decides the "account used" but the `TENANT_ID` part of the API key (see previous section).
 
-So, as long as you use the same API key, accessing the `/-_-/ui/` admin UI from any of your custom domains is exactly the same.
+So, as long as you use the same API key, accessing the `/admin/ui/` admin UI from any of your custom domains is exactly the same.
 
 ## Admin UI
 
-There is an admin UI at `/-_-/ui/`, e.g. <http://127.0.0.1:8787/-_-/ui/> where you can put the test API KEY `t_key_TENANT1111_sometoken` in the input box and it will start pinging the local workers (started in step 3 above).
+There is an admin UI at `/admin/ui/`, e.g. <http://127.0.0.1:8787/admin/ui/> where you can put the test API KEY `t_key_TENANT1111_sometoken` in the input box and it will start pinging the local workers (started in step 3 above).
 
-I often refresh the page to make sure everything is reset, so for ease of use you can also provide the token in the URL hash segment, e.g. <http://127.0.0.1:8787/-_-/ui/#tApiKey=t_key_TENANT1111_sometoken>.
+I often refresh the page to make sure everything is reset, so for ease of use you can also provide the token in the URL hash segment, e.g. <http://127.0.0.1:8787/admin/ui/#tApiKey=t_key_TENANT1111_sometoken>.
 
 The admin UI allows you to list, delete, and create redirection rules.
 Soon, the UI will also show analytics and statistics about the visits of these links, which was one of the motivations doing the project in the first place.
