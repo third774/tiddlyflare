@@ -37,6 +37,14 @@ const TenantMigrations: SchemaMigration[] = [
 			);
         `,
 	},
+	{
+		idMonotonicInc: 2,
+		description: 'add timestamp column to wikis',
+		sql: `
+            ALTER TABLE wikis
+			ADD createdAtMs INTEGER;
+        `,
+	},
 ];
 
 export class TenantDO extends DurableObject {
@@ -88,9 +96,9 @@ export class TenantDO extends DurableObject {
 		// that does a first round-trip to US to figure out the colo of the DO.
 		// See https://developers.cloudflare.com/durable-objects/api/namespace/#newuniqueid
 		const wikiId = doId.toString();
-		const { redirectUrl } = await this.env.WIKI.get(doId).create(tenantId, wikiId, name, wikiType);
+		const { redirectUrl, createdAtMs } = await this.env.WIKI.get(doId).create(tenantId, wikiId, name, wikiType);
 
-		this.sql.exec(`INSERT OR REPLACE INTO wikis VALUES (?, ?, ?, ?);`, wikiId, tenantId, name, wikiType);
+		this.sql.exec(`INSERT OR REPLACE INTO wikis VALUES (?, ?, ?, ?, ?);`, wikiId, tenantId, name, wikiType, createdAtMs);
 
 		return { ok: true, redirectUrl };
 	}
@@ -127,6 +135,7 @@ export class TenantDO extends DurableObject {
 					name: String(row.name),
 					wikiUrl: `/w/${encodeURIComponent(String(row.wikiId))}/${encodeURIComponent(String(row.name))}`,
 					wikiType: String(row.wikiType),
+					createdAtMs: Number(row.createdAtMs),
 				})),
 		};
 		return { data };
@@ -230,6 +239,7 @@ export class WikiDO extends DurableObject {
 		return {
 			ok: true,
 			redirectUrl: `/w/${wikiId}/${name}`,
+			createdAtMs: tsMs,
 		};
 	}
 

@@ -9,6 +9,7 @@ export interface ApiWiki {
 	wikiId: string;
 	wikiUrl: string;
 	wikiType: string;
+	createdAtMs: number,
 
 	tenantId: string;
 }

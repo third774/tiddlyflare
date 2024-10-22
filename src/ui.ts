@@ -264,9 +264,18 @@ function WikiList(props: { data: ApiListWikisResponse['data']; swapOOB: boolean 
 				data.wikis.map(
 					(wiki) => html`
 						<article>
-							<header><a href="${wiki.wikiUrl}" target="_blank">${wiki.name ?? wiki.wikiId} ↝</a></header>
+							<header>
+								<a href="${wiki.wikiUrl}" target="_blank">${wiki.name ?? wiki.wikiId} ↝</a>
+								<span>
+								${
+									wiki.createdAtMs
+									? html`<small>(<em>${new Date(wiki.createdAtMs).toISOString()}</em>)</small>`
+									: null
+								}
+								</span>
+							</header>
 							<section>
-								<small><strong>ID</strong> <code>${wiki.wikiId}</code></small>
+								<div><small><strong>ID</strong> <code class="text-wrap">${wiki.wikiId}</code></small></div>
 							</section>
 							<footer>
 								<button
@@ -414,6 +423,12 @@ function Layout(props: { title: string; description: string; image: string; chil
 
 					.rediflare-name {
 						font-weight: bold;
+					}
+
+					.text-wrap {
+						word-wrap: break-word;
+  						word-break: break-all;
+						white-space: pre-wrap;
 					}
 				</style>
 			</head>
