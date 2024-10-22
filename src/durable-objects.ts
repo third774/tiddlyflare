@@ -279,18 +279,29 @@ export class WikiDO extends DurableObject {
 				// Streaming dance!
 
 				let chunkIdx = 0;
-				const reader = bytesStream.getReader();
+				const reader = bytesStream.getReader({ mode: 'byob' });
 				let bufferArraysTotal = 0;
 				const bufferArrays = [];
 				while (true) {
-					// In tests with wrangler this returns 4KB each time. So we need to buffer it
-					// to avoid writing a row per 4KB.
+					// In tests with wrangler, the default `bytesStream.getReader().read()` returns 4KB each time.
+					// That is very inefficient for our needs, so we need to do in-memory buffering to gather
+					// up to our desired chunk size for storing in SQLite, and avoid hundreds of rows.
 					//
-					// TODO Switch to BYOB to avoid extra allocations for the returned buffer?
+					// I decided to switch to BYOB to avoid extra allocations for the returned buffer,
+					// and have more control over the size of each chunk returned by `reader.read(...)`.
+					//
+					// WARNING: The `reader.readAtLeast(...)` method is NOT Standards-compliant, so copy pasting
+					//          this logic outside of Workers will NOT work. Switch to the default
+					//          `bytesStream.getReader().read()` approach in that case.
+					//
+					// The code below continues to do in-memory buffering even with the BYOB approach
+					// just to stay consistent with the default reader and standard-compliant `read()` in case
+					// we switch to it again for any reason. There shouldn't be any extra overhead anyway.
+					//
 					// - https://developer.mozilla.org/en-US/docs/Web/API/ReadableStreamBYOBReader/read
 					// - https://developers.cloudflare.com/workers/runtime-apis/streams/readablestreambyobreader/
 					//
-					const { value, done } = await reader.read();
+					const { value, done } = await reader.readAtLeast(CHUNK_SIZE_MAX, new Uint8Array(CHUNK_SIZE_MAX));
 					// console.log('Received', done, value?.byteLength);
 					if (!done) {
 						if (!(value instanceof Uint8Array)) {
@@ -350,7 +361,7 @@ export class WikiDO extends DurableObject {
 					chunkIdx,
 					chunkIdx
 				);
-				console.log({ message: 'WIKI: INSERT INTO wiki_versions', wikiId, tsMs, chunkIdx, rowsWritten, rowsRead });
+				console.log({ message: 'WIKI: INSERT INTO wiki_versions', wikiId, tsMs, chunkIdx, chunkSz: 0, rowsWritten, rowsRead });
 			}
 
 			// Retain only the latest 10 versions, otherwise we would hit the DO storage limit of 1GB fast.
@@ -444,8 +455,8 @@ export class WikiDO extends DurableObject {
 
 	async deleteAll() {
 		this.fileSrc = null;
-		this.wikiId = "";
-		this.tenantId = "";
+		this.wikiId = '';
+		this.tenantId = '';
 
 		await this.storage.deleteAll();
 
@@ -551,7 +562,7 @@ export async function routeUpsertWiki(env: CfEnv, wikiId: string, bytes: Readabl
 			throw new Error('could not save wiki');
 		}
 	} catch (e) {
-		console.error({message: 'WIKI failed to upsert', error: e});
+		console.error({ message: 'WIKI failed to upsert', error: e });
 		throw new Error('WIKI failed to save your updates');
 	}
 }
