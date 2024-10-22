@@ -2,9 +2,8 @@ import { Hono } from 'hono';
 import { html, raw } from 'hono/html';
 import { ApiListWikisResponse, RequestVars } from './types';
 import { HTTPException } from 'hono/http-exception';
-import { CfEnv, routeListWikis } from './durable-objects';
+import { CfEnv, routeCreateWiki, routeDeleteWiki, routeListWikis } from './durable-objects';
 import { apiKeyAuth } from './shared';
-import { nanoid } from 'nanoid';
 
 export const uiAdmin = new Hono<{ Bindings: CfEnv; Variables: RequestVars }>();
 export const uiAbout = new Hono<{ Bindings: CfEnv; Variables: RequestVars }>();
@@ -92,7 +91,7 @@ complex information`;
 	<hr>
 	<footer class="container text-center">
 		<p>${RediflareName()} is built by <a href="https://www.lambrospetrou.com" target="_blank">Lambros Petrou</a>. 🚀</p>
-		<!-- <p><small><a href="/-_-/ui/" class="secondary">Open Admin UI</a></small></p> -->
+		<p><small><a href="/admin/ui/" class="secondary">Open Admin UI</a></small></p>
 	</footer>
 
 	<style>
@@ -173,14 +172,6 @@ complex information`;
 `;
 }
 
-// uiAdmin.get('/-_-/ui/static/*', async (c) => {
-// 	const url = new URL(c.req.raw.url);
-// 	// TODO Private assets should be hosted under `/cdn-cgi/`.
-// 	url.pathname = url.pathname.substring('/-_-'.length);
-// 	const req = new Request(url, c.req.raw);
-// 	return c.env.ASSETS.fetch(req);
-// });
-
 uiAdmin.use('/-_-/ui/partials.*', async (c, next) => {
 	const tenantId = apiKeyAuth(c.env, c.req.raw);
 	c.set('tenantId', tenantId);
@@ -200,7 +191,7 @@ uiAdmin.get('/admin/ui', async (c) => {
 });
 
 uiAdmin.get('/-_-/ui/partials.ListWikis', async (c) => {
-	const { data } = await routeListWikis(c.req.raw, c.env, c.var.tenantId);
+	const { data } = await routeListWikis(c.env, c.var.tenantId);
 	const wikisEl = WikiList({
 		data,
 		swapOOB: false,
@@ -208,79 +199,56 @@ uiAdmin.get('/-_-/ui/partials.ListWikis', async (c) => {
 	return c.html(html`${wikisEl}`);
 });
 
-// uiAdmin.get('/-_-/ui/partials.ListStats', async (c) => {
-// 	const { data } = await routeListUrlRedirects(c.req.raw, c.env, c.var.tenantId);
-// 	console.log(c.req.query());
-// 	const days = Number.parseInt(c.req.query('days') ?? '0', 10);
+uiAdmin.post('/-_-/ui/partials.CreateWiki', async (c) => {
+	const form = await c.req.raw.formData();
+	const name = ((form.get('name') as string) ?? '').trim();
+	if (!name) {
+		throw new HTTPException(400, {
+			res: new Response(`<p>Invalid wiki name!</p>`, { status: 400 }),
+		});
+	}
+	const wikiType = (form.get('wikiType') as string) ?? '';
+	if (!wikiType) {
+		throw new HTTPException(400, {
+			res: new Response(`<p>Invalid wiki type!</p>`, { status: 400 }),
+		});
+	}
 
-// 	const statsEl = RuleStats({
-// 		data,
-// 		days,
-// 		swapOOB: true,
-// 	});
+	const _ = await routeCreateWiki(
+		c.env,
+		c.var.tenantId,
+		name,
+		wikiType
+	);
+	const {data} = await routeListWikis(c.env, c.var.tenantId);
+	const rulesEl = WikiList({
+		data,
+		swapOOB: true,
+	});
+	const createRuleForm = CreateRuleForm();
 
-// 	return c.html(html`${statsEl}`);
-// });
+	return c.html(html`${createRuleForm} ${rulesEl}`);
+});
 
-// uiAdmin.post('/-_-/ui/partials.DeleteRule', async (c) => {
-// 	const form = await c.req.raw.formData();
-// 	const ruleUrl = decodeURIComponent((form.get('ruleUrl') as string) ?? '');
-// 	if (!ruleUrl) {
-// 		throw new HTTPException(400, {
-// 			res: new Response(`<p>Invalid request for deletion!</p>`, { status: 400 }),
-// 		});
-// 	}
-// 	const { data } = await routeDeleteUrlRedirect(
-// 		new Request(c.req.raw.url, {
-// 			body: JSON.stringify({ ruleUrl }),
-// 			method: 'POST',
-// 		}),
-// 		c.env,
-// 		c.var.tenantId
-// 	);
-// 	const rulesEl = Rules({
-// 		data,
-// 		swapOOB: false,
-// 	});
-// 	const statsEl = RuleStats({
-// 		data,
-// 		days: 31,
-// 		swapOOB: false,
-// 	});
-// 	return c.html(html`${rulesEl} ${statsEl}`);
-// });
-
-// uiAdmin.post('/-_-/ui/partials.CreateRule', async (c) => {
-// 	const form = await c.req.raw.formData();
-// 	const newRuleJson = (form.get('newRuleJson') as string) ?? '';
-// 	if (!newRuleJson) {
-// 		throw new HTTPException(400, {
-// 			res: new Response(`<p>Invalid request for creation!</p>`, { status: 400 }),
-// 		});
-// 	}
-
-// 	// TODO Parse and validate it before sending it to the DO.
-// 	const { data } = await routeUpsertUrlRedirect(
-// 		new Request(c.req.raw.url, {
-// 			body: newRuleJson,
-// 			method: 'POST',
-// 		}),
-// 		c.env,
-// 		c.var.tenantId
-// 	);
-// 	const rulesEl = Rules({
-// 		data,
-// 		swapOOB: true,
-// 	});
-// 	const statsEl = RuleStats({
-// 		data,
-// 		days: 31,
-// 		swapOOB: true,
-// 	});
-// 	const createRuleForm = CreateRuleForm();
-
-// 	return c.html(html`${createRuleForm} ${rulesEl} ${statsEl}`);
-// });
+uiAdmin.post('/-_-/ui/partials.DeleteWiki', async (c) => {
+	const form = await c.req.raw.formData();
+	const wikiId = decodeURIComponent((form.get('wikiId') as string) ?? '').trim();
+	if (!wikiId) {
+		throw new HTTPException(400, {
+			res: new Response(`<p>Invalid request for deletion!</p>`, { status: 400 }),
+		});
+	}
+	const { data } = await routeDeleteWiki(
+		c.env,
+		c.var.tenantId,
+		wikiId,
+	);
+	const rulesEl = WikiList({
+		data,
+		swapOOB: false,
+	});
+	return c.html(html`${rulesEl}`);
+});
 
 function WikiList(props: { data: ApiListWikisResponse['data']; swapOOB: boolean }) {
 	const { data, swapOOB } = props;
@@ -320,90 +288,9 @@ function WikiList(props: { data: ApiListWikisResponse['data']; swapOOB: boolean 
 	`;
 }
 
-// function RuleStats(props: { data: ApiListRedirectRulesResponse['data']; swapOOB: boolean; days?: number }) {
-// 	const { data, days, swapOOB } = props;
-
-// 	if (!data.rules.length && !data.stats.length) {
-// 		return html`<p>You have no statistics yet (•_•)</p>`;
-// 	}
-
-// 	if (days && days > 0) {
-// 		// We cutoff 1h extra to cover our bucketing of 1h slots.
-// 		const tsCutoff = Date.now() - days * 25 * 60 * 60 * 1000;
-// 		data.stats = data.stats.filter((s) => s.tsHourMs > tsCutoff);
-// 	}
-
-// 	data.stats.sort((s1, s2) => {
-// 		if (s1.tsHourMs !== s2.tsHourMs) {
-// 			return s2.tsHourMs - s1.tsHourMs;
-// 		}
-// 		return s2.ruleUrl.localeCompare(s1.ruleUrl);
-// 	});
-
-// 	const totalAggs = new Map<string, number>();
-// 	data.stats.forEach((s) => totalAggs.set(s.ruleUrl, (totalAggs.get(s.ruleUrl) ?? 0) + s.totalVisits));
-// 	const totalCountsSorted = [...totalAggs.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-
-// 	const statsByRuleUrl = new Map<string, Array<object>>();
-// 	data.stats.forEach((s) => {
-// 		if (!statsByRuleUrl.has(s.ruleUrl)) {
-// 			statsByRuleUrl.set(s.ruleUrl, []);
-// 		}
-// 		statsByRuleUrl.get(s.ruleUrl)!.push(s);
-// 	});
-
-// 	return html` <section id="stats-list" hx-swap-oob="${swapOOB ? 'true' : undefined}">
-// 		<hgroup>
-// 			<div>
-// 				<h3>Statistics</h3>
-// 				<div role="group">
-// 					<button class="${!days ? 'primary' : 'outline'}" hx-get="/-_-/ui/partials.ListStats">Raw</button>
-// 					<button class="${days === 366 ? 'primary' : 'outline'}" hx-get="/-_-/ui/partials.ListStats?days=366">1y</button>
-// 					<button class="${days === 31 ? 'primary' : 'outline'}" hx-get="/-_-/ui/partials.ListStats?days=31">1m</button>
-// 					<button class="${days === 7 ? 'primary' : 'outline'}" hx-get="/-_-/ui/partials.ListStats?days=7">1w</button>
-// 				</div>
-// 			</div>
-// 			${data.stats.length === 0 ? html`<p>No stats have been aggregated yet.</p>` : null}
-// 		</hgroup>
-// 		<table class="striped">
-// 			<thead>
-// 				<tr>
-// 					<th scope="col">Rule URL</th>
-// 					<th scope="col">Total count</th>
-// 				</tr>
-// 			</thead>
-// 			<tbody>
-// 				${totalCountsSorted.map(
-// 					([ruleUrl, cnt]) =>
-// 						html`<tr>
-// 							<th scope="row">${ruleUrl}</th>
-// 							<td>${cnt}</td>
-// 						</tr>`
-// 				)}
-// 			</tbody>
-// 		</table>
-
-// 		${totalCountsSorted.map(([ruleUrl, totalCount]) => {
-// 			const randomId = nanoid();
-// 			return html`
-// 				<article>
-// 					<header><strong>${ruleUrl}</strong> • <em>(${totalCount})</em></header>
-// 					<section>
-// 						<script id="plot-data-${randomId}" type="application/json">
-// 							${raw(JSON.stringify(statsByRuleUrl.get(ruleUrl)))}
-// 						</script>
-// 						<rf-plot-bar data-json-selector="#plot-data-${randomId}" data-days="${days}"></rf-plot-bar>
-// 					</section>
-// 					<!-- <footer></footer> -->
-// 				</article>
-// 			`;
-// 		})}
-// 	</section>`;
-// }
-
 function CreateRuleForm() {
 	return html`
-		<form id="create-container" action="#" hx-post="/-_-/ui/partials.CreateRule" hx-target="#create-container" hx-swap="outerHTML">
+		<form id="create-container" action="#" hx-post="/-_-/ui/partials.CreateWiki" hx-target="#create-container" hx-swap="outerHTML">
 			<hgroup>
 				<h3>Create new TiddlyWiki</h3>
 				<!-- <p>Enter a display name for your wiki to identify it in the dashboard.</p> -->

@@ -1,7 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
-import { ApiListWikisResponse, WikiType } from './types';
+import { ApiListWikisResponse, ApiWiki, WikiType } from './types';
 import { SchemaMigration, SchemaMigrations } from './sql-migrations';
 import { chunkify, mergeArrayBuffers } from './shared';
+import { HTTPException } from 'hono/http-exception';
 
 export interface CfEnv {
 	TENANT: DurableObjectNamespace<TenantDO>;
@@ -77,8 +78,8 @@ export class TenantDO extends DurableObject {
 		return this.tenantId;
 	}
 
-	async createWiki(tenantId: string, name: string, wikiType: WikiType) {
-		console.log({ message: 'TENANT: createWiki', tenantId, name, wikiType });
+	async createWiki(tenantId: string, name: string, wikiType: string) {
+		// console.log({ message: 'TENANT: createWiki', tenantId, name, wikiType });
 		await this._initTables(tenantId);
 
 		const doId = this.env.WIKI.newUniqueId();
@@ -94,23 +95,24 @@ export class TenantDO extends DurableObject {
 		return { ok: true, redirectUrl };
 	}
 
-	// async delete(tenantId: string, ruleUrl: string): Promise<ApiListRedirectRulesResponse> {
-	// 	// console.log('BOOM :: TENANT :: DELETE', tenantId, ruleUrl);
-	// 	await this._initTables(tenantId);
+	async deleteWiki(tenantId: string, wikiId: string): Promise<ApiListWikisResponse> {
+		console.log({ message: 'TENANT: deleteWiki', tenantId, wikiId });
+		await this._initTables(tenantId);
 
-	// 	await this.makeWikiStub(tenantId, ruleUrl).deleteAll();
+		const doId = this.env.WIKI.idFromString(wikiId);
+		await this.env.WIKI.get(doId).deleteAll();
 
-	// 	this.sql.exec(`DELETE FROM rules WHERE rule_url = ? AND tenant_id = ?;`, ruleUrl, tenantId);
+		this.sql.exec(`DELETE FROM wikis WHERE wikiId = ? AND tenantId = ?;`, wikiId, tenantId);
 
-	// 	return this.list();
-	// }
+		return this.list();
+	}
 
 	async list(): Promise<ApiListWikisResponse> {
 		// console.log('BOOM :: TENANT :: LIST', this.tenantId);
 		if (!this.tenantId) {
 			return {
 				data: {
-					wikis: []
+					wikis: [],
 				},
 			};
 		}
@@ -123,7 +125,7 @@ export class TenantDO extends DurableObject {
 					tenantId: String(row.tenantId),
 					wikiId: String(row.wikiId),
 					name: String(row.name),
-					wikiUrl: `/w/${String(row.wikiId)}/${String(row.name)}`,
+					wikiUrl: `/w/${encodeURIComponent(String(row.wikiId))}/${encodeURIComponent(String(row.name))}`,
 					wikiType: String(row.wikiType),
 				})),
 		};
@@ -198,7 +200,7 @@ export class WikiDO extends DurableObject {
 		}
 	}
 
-	async create(tenantId: string, wikiId: string, name: string, wikiType: WikiType) {
+	async create(tenantId: string, wikiId: string, name: string, wikiType: string) {
 		// Fetch the content of the wiki based on the wikiType.
 		switch (wikiType) {
 			case 'tw5':
@@ -248,7 +250,7 @@ export class WikiDO extends DurableObject {
 
 				this.storage.transactionSync(() => {
 					for (let i = 0; i < chunks.length; i++) {
-						const chunkIdx = i+1;
+						const chunkIdx = i + 1;
 						const { rowsRead, rowsWritten } = this.sql.exec(
 							`INSERT OR REPLACE INTO wiki_versions VALUES (?, ?, ?, ?, ?);`,
 							wikiId,
@@ -432,6 +434,8 @@ export class WikiDO extends DurableObject {
 
 	async deleteAll() {
 		this.fileSrc = null;
+		this.wikiId = "";
+		this.tenantId = "";
 
 		await this.storage.deleteAll();
 
@@ -502,29 +506,30 @@ export class WikiDO extends DurableObject {
 // API Handlers
 ////////////////
 
-export async function routeCreateWiki(env: CfEnv, tenantId: string, name: string, wikiType: WikiType) {
-	try {
-		let id: DurableObjectId = env.TENANT.idFromName(tenantId);
-		let tenantStub = env.TENANT.get(id);
-		const resp = await tenantStub.createWiki(tenantId, name, wikiType);
-		return Response.json(resp, { status: 201 });
-	} catch (e) {
-		return Response.json({ ok: false }, { status: 500 });
-	}
-}
-
-export async function routeListWikis(request: Request, env: CfEnv, tenantId: string): Promise<ApiListWikisResponse> {
-	let id: DurableObjectId = env.TENANT.idFromName(tenantId);
-	let tenantStub = env.TENANT.get(id);
-
-	return tenantStub.list();
-}
-
 export async function routeWikiRequest(env: CfEnv, wikiId: string, _name: string) {
 	// Convert the hex ID back to the correct Durable Object ID.
 	let id: DurableObjectId = env.WIKI.idFromString(wikiId);
 	let stub = env.WIKI.get(id);
 	return stub.getFileSrc(wikiId);
+}
+
+export async function routeCreateWiki(env: CfEnv, tenantId: string, name: string, wikiType: string) {
+	try {
+		let id: DurableObjectId = env.TENANT.idFromName(tenantId);
+		let tenantStub = env.TENANT.get(id);
+		const resp = await tenantStub.createWiki(tenantId, name, wikiType);
+		return { redirectUrl: resp.redirectUrl };
+	} catch (e) {
+		// TODO Anything special to say?
+		throw e;
+	}
+}
+
+export async function routeListWikis(env: CfEnv, tenantId: string): Promise<ApiListWikisResponse> {
+	let id: DurableObjectId = env.TENANT.idFromName(tenantId);
+	let tenantStub = env.TENANT.get(id);
+
+	return tenantStub.list();
 }
 
 export async function routeUpsertWiki(env: CfEnv, wikiId: string, bytes: ReadableStream, contentLength?: number) {
@@ -536,19 +541,14 @@ export async function routeUpsertWiki(env: CfEnv, wikiId: string, bytes: Readabl
 			throw new Error('could not save wiki');
 		}
 	} catch (e) {
-		console.error('WIKI failed to upsert:', e);
+		console.error({message: 'WIKI failed to upsert', error: e});
 		throw new Error('WIKI failed to save your updates');
 	}
 }
 
-// export async function routeDeleteUrlRedirect(request: Request, env: CfEnv, tenantId: string): Promise<ApiListRedirectRulesResponse> {
-// 	interface Params {
-// 		ruleUrl: string;
-// 	}
-// 	const params = (await request.json()) as Params;
+export async function routeDeleteWiki(env: CfEnv, tenantId: string, wikiId: string): Promise<ApiListWikisResponse> {
+	let id: DurableObjectId = env.TENANT.idFromName(tenantId);
+	let tenantStub = env.TENANT.get(id);
 
-// 	let id: DurableObjectId = env.TENANT.idFromName(tenantId);
-// 	let tenantStub = env.TENANT.get(id);
-
-// 	return tenantStub.delete(tenantId, params.ruleUrl);
-// }
+	return tenantStub.deleteWiki(tenantId, wikiId);
+}

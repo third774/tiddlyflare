@@ -19,7 +19,7 @@ app.onError((e, c) => {
 		// Get the custom response
 		return e.getResponse();
 	}
-	console.error('failed to handle the request: ', e);
+	console.error({message: 'failed to handle the request', error: e});
 	return new Response('failed to handle the request: ' + e.message, {
 		status: 500,
 		statusText: e.name,
@@ -76,7 +76,8 @@ app.post('/-_-/v1/wikis.Create', async (c) => {
 		);
 	}
 
-	return await routeCreateWiki(c.env, c.var.tenantId, params.name, params.wikiType);
+	const {redirectUrl} = await routeCreateWiki(c.env, c.var.tenantId, params.name, params.wikiType);
+	return Response.json({redirectUrl});
 });
 
 // app.post('/-_-/v1/redirects.Delete', async (c) => {
