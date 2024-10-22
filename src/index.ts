@@ -163,6 +163,7 @@ app.options('/w/:wikiId/:name', async (c) => {
 
 app.all('/*', async (c) => {
 	return c.text('_|_', {
+		status: 404,
 		headers: {
 			'X-Powered-By': 'Tiddlyflare',
 		},
