@@ -81,7 +81,7 @@ _Coming soon..._
 
 How are Durable Objects used in this project?
 
-_Coming soon..._
+Read "Building a global TiddlyWiki hosting platform with Cloudflare Durable Objects and Workers — Tiddlyflare": https://www.lambrospetrou.com/articles/tiddlyflare/
 
 ## Contact - Help - Feedback
 
