@@ -77,7 +77,7 @@ app.post('/-_-/v1/wikis.Create', async (c) => {
 	}
 
 	const {redirectUrl} = await routeCreateWiki(c.env, c.var.tenantId, params.name, params.wikiType);
-	return Response.json({redirectUrl});
+	return Response.json({redirectUrl}, {status: 201});
 });
 
 // app.post('/-_-/v1/redirects.Delete', async (c) => {

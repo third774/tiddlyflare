@@ -2,7 +2,7 @@
 # Create a new wiki.
 
 POST http://127.0.0.1:8787/-_-/v1/wikis.Create
-Tiddlyflare-Api-Key: tf_key_TENANT1111_sometoken
+Tiddlyflare-Api-Key: t_key_TENANT1111_sometoken
 ```json
 {
     "name": "notes-1",
@@ -17,7 +17,7 @@ wikiUrl: jsonpath "$.redirectUrl"
 # Assert that we get some HTML back.
 
 GET http://127.0.0.1:8787{{ wikiUrl }}
-Tiddlyflare-Api-Key: tf_key_TENANT1111_sometoken
+Tiddlyflare-Api-Key: t_key_TENANT1111_sometoken
 HTTP 200
 [Captures]
 wikiHtmlBytes: bytes
@@ -29,7 +29,7 @@ xpath "string(/html/head/title)" contains "My TiddlyWiki"
 # Assert that we get the same HTML back a 2nd time.
 
 GET http://127.0.0.1:8787{{ wikiUrl }}
-Tiddlyflare-Api-Key: tf_key_TENANT1111_sometoken
+Tiddlyflare-Api-Key: t_key_TENANT1111_sometoken
 HTTP 200
 [Asserts]
 bytes == {{ wikiHtmlBytes }}
