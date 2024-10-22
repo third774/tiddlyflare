@@ -62,7 +62,7 @@ export function apiKeyAuth(env: CfEnv, request: Request) {
 			message: 'Tiddlyflare-Api-Key is malformed',
 		});
 	}
-	const tenantId = authKey.slice('tf_key_'.length, lastSepIdx)?.trim();
+	const tenantId = authKey.slice('t_key_'.length, lastSepIdx)?.trim();
 	if (!tenantId) {
 		throw new HTTPException(403, {
 			message: 'Tiddlyflare-Api-Key is malformed',

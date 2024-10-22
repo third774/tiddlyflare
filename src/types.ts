@@ -4,31 +4,17 @@ export interface RequestVars {
 
 export type WikiType = "tw5";
 
-export interface ApiRedirectRule {
+export interface ApiWiki {
+	name: string;
+	wikiId: string;
+	wikiUrl: string;
+	wikiType: string;
+
 	tenantId: string;
-	ruleUrl: string;
-	responseStatus: number;
-	responseLocation: string;
-	responseHeaders: string[2][];
 }
 
-export interface ApiRedirectRuleStatsAggregated {
-	tenantId: string,
-	ruleUrl: string;
-	tsHourMs: number;
-	totalVisits: number;
-}
-
-export interface ApiListRedirectRulesResponse {
+export interface ApiListWikisResponse {
 	data: {
-		rules: ApiRedirectRule[];
-		stats: ApiRedirectRuleStatsAggregated[];
+		wikis: ApiWiki[];
 	};
-}
-
-export interface ApiUrlVisitStatsSingle {
-	ruleUrl: string;
-	tsMs: number;
-	id: string;
-	requestDetailsJson: string;
 }

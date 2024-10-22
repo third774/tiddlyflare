@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { WikiType } from './types';
+import { ApiListWikisResponse, WikiType } from './types';
 import { SchemaMigration, SchemaMigrations } from './sql-migrations';
 import { chunkify, mergeArrayBuffers } from './shared';
 
@@ -105,41 +105,30 @@ export class TenantDO extends DurableObject {
 	// 	return this.list();
 	// }
 
-	// async list(): Promise<ApiListRedirectRulesResponse> {
-	// 	// console.log('BOOM :: TENANT :: LIST', this.tenantId);
-	// 	if (!this.tenantId) {
-	// 		return {
-	// 			data: {
-	// 				rules: [],
-	// 				stats: [],
-	// 			},
-	// 		} as ApiListRedirectRulesResponse;
-	// 	}
+	async list(): Promise<ApiListWikisResponse> {
+		// console.log('BOOM :: TENANT :: LIST', this.tenantId);
+		if (!this.tenantId) {
+			return {
+				data: {
+					wikis: []
+				},
+			};
+		}
 
-	// 	const data: ApiListRedirectRulesResponse['data'] = {
-	// 		rules: this.sql
-	// 			.exec('SELECT * FROM rules;')
-	// 			.toArray()
-	// 			.map((row) => ({
-	// 				tenantId: String(row.tenant_id),
-	// 				ruleUrl: String(row.rule_url),
-	// 				responseStatus: Number(row.response_status),
-	// 				responseLocation: String(row.response_location),
-	// 				responseHeaders: JSON.parse(row.response_headers as string) as string[2][],
-	// 			})),
-
-	// 		stats: this.sql
-	// 			.exec('SELECT * FROM url_visits_stats_agg')
-	// 			.toArray()
-	// 			.map((row) => ({
-	// 				tenantId: String(row.tenant_id),
-	// 				ruleUrl: String(row.rule_url),
-	// 				tsHourMs: Number(row.ts_hour_ms),
-	// 				totalVisits: Number(row.total_visits),
-	// 			})),
-	// 	};
-	// 	return { data };
-	// }
+		const data: ApiListWikisResponse['data'] = {
+			wikis: this.sql
+				.exec('SELECT * FROM wikis;')
+				.toArray()
+				.map((row) => ({
+					tenantId: String(row.tenantId),
+					wikiId: String(row.wikiId),
+					name: String(row.name),
+					wikiUrl: `/w/${String(row.wikiId)}/${String(row.name)}`,
+					wikiType: String(row.wikiType),
+				})),
+		};
+		return { data };
+	}
 }
 
 const WikiMigrations: SchemaMigration[] = [
@@ -524,12 +513,12 @@ export async function routeCreateWiki(env: CfEnv, tenantId: string, name: string
 	}
 }
 
-// export async function routeListUrlRedirects(request: Request, env: CfEnv, tenantId: string): Promise<ApiListRedirectRulesResponse> {
-// 	let id: DurableObjectId = env.TENANT.idFromName(tenantId);
-// 	let tenantStub = env.TENANT.get(id);
+export async function routeListWikis(request: Request, env: CfEnv, tenantId: string): Promise<ApiListWikisResponse> {
+	let id: DurableObjectId = env.TENANT.idFromName(tenantId);
+	let tenantStub = env.TENANT.get(id);
 
-// 	return tenantStub.list();
-// }
+	return tenantStub.list();
+}
 
 export async function routeWikiRequest(env: CfEnv, wikiId: string, _name: string) {
 	// Convert the hex ID back to the correct Durable Object ID.
