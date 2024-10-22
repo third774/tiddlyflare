@@ -11,7 +11,7 @@ I assume that you already have a Cloudflare account with a Workers Paid plan ($5
 1. Install dependencies: `npm ci`.
 2. Create a local file `.dev.vars` with the following content:
     ```
-    VAR_API_AUTH_ADMIN_KEYS_CSV=",rf_key_TENANT1111_sometoken,"
+    VAR_API_AUTH_ADMIN_KEYS_CSV=",t_key_TENANT1111_sometoken,"
     ```
 3. Start the local setup using `npm run dev`. This should start the Workers/Durable Objects listening on <http://127.0.0.1:8787>.
 4. Run the tests against that: `npm run test`.
@@ -35,7 +35,7 @@ To generate an API key according to the format expected run: `npm run --silent g
 Example:
 ```sh
 $ npm run --silent gen:apikey
-rf_key_dP1gH07gDCnWwql9HrwPshZzsQfxCCgh_vm6PT3RH5fK37hS8fl6B5NlRJ8M460dKD4qS
+t_key_dP1gH07gDCnWwql9HrwPshZzsQfxCCgh_vm6PT3RH5fK37hS8fl6B5NlRJ8M460dKD4qS
 ```
 
 Then, once you have the above key run `npx wrangler secret put --env {staging,prod,dev} VAR_API_AUTH_ADMIN_KEYS_CSV` to store it in your worker (you will need to paste it after prompted), or just create it through the Cloudflare dashboard.
@@ -66,9 +66,9 @@ So, as long as you use the same API key, accessing the `/-_-/ui/` admin UI from 
 
 ## Admin UI
 
-There is an admin UI at `/-_-/ui/`, e.g. <http://127.0.0.1:8787/-_-/ui/> where you can put the test API KEY `rf_key_TENANT1111_sometoken` in the input box and it will start pinging the local workers (started in step 3 above).
+There is an admin UI at `/-_-/ui/`, e.g. <http://127.0.0.1:8787/-_-/ui/> where you can put the test API KEY `t_key_TENANT1111_sometoken` in the input box and it will start pinging the local workers (started in step 3 above).
 
-I often refresh the page to make sure everything is reset, so for ease of use you can also provide the token in the URL hash segment, e.g. <http://127.0.0.1:8787/-_-/ui/#rfApiKey=rf_key_TENANT1111_sometoken>.
+I often refresh the page to make sure everything is reset, so for ease of use you can also provide the token in the URL hash segment, e.g. <http://127.0.0.1:8787/-_-/ui/#tApiKey=t_key_TENANT1111_sometoken>.
 
 The admin UI allows you to list, delete, and create redirection rules.
 Soon, the UI will also show analytics and statistics about the visits of these links, which was one of the motivations doing the project in the first place.
