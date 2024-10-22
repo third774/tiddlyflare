@@ -40,7 +40,7 @@ bindings = [
 [env.staging]
 name = "tiddlyflare-staging"
 routes = [
-    { pattern = "tiddly-staging.lambros.dev", custom_domain = true },
+    { pattern = "tiddly-staging.kevinkipp.com", custom_domain = true },
 ]
 
 [env.staging.vars]
@@ -65,7 +65,7 @@ bindings = [
 [env.prod]
 name = "tiddlyflare-prod"
 routes = [
-    { pattern = "tiddly.lambros.dev", custom_domain = true },
+    { pattern = "tiddly.kevinkipp.com", custom_domain = true },
 ]
 
 [env.prod.vars]
