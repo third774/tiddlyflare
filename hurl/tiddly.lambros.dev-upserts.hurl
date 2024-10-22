@@ -5,18 +5,18 @@ POST {{ BASEURL }}/-_-/v1/wikis.Create
 Tiddlyflare-Api-Key: {{ TIDDLYFLARE_API_KEY }}
 ```json
 {
-    "name": "notes-01",
+    "name": "testing-notes-01",
     "wikiType": "tw5"
 }
 ```
-HTTP 200
+HTTP 201
 [Captures]
 wikiUrl: jsonpath "$.redirectUrl"
 
 #########################
 # Assert that we get some HTML back.
 
-GET {{ BASEURL }}/{{ wikiUrl }}
+GET {{ BASEURL }}{{ wikiUrl }}
 Tiddlyflare-Api-Key: {{ TIDDLYFLARE_API_KEY }}
 HTTP 200
 [Captures]
