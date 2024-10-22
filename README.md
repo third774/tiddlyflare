@@ -24,7 +24,7 @@ That's it! 🥳
 
 The API provided by the Worker is protected using the header `Tiddlyflare-Api-Key` that expects a string value of the format `t_key_<TENANT_ID>_<TOKEN>`.
 
-The `TENANTID` should be non-empty and is used as sharding mechanism for the multi-tenancy aspects. Some of the multi-tenancy features are not implemented yet though.
+The `TENANTID` should be non-empty and is used as sharding mechanism for the multi-tenancy aspects (i.e. multiple users having their own list of wikis).
 
 The whole API key is checked against a [Secret](https://developers.cloudflare.com/workers/configuration/secrets/) configured for the worker named `VAR_API_AUTH_ADMIN_KEYS_CSV` (as you saw in step 2 above).
 
